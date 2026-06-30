@@ -1,22 +1,41 @@
 export type ContractStatus = 'Ativo' | 'Cancelado' | 'Distrato Pendente' | 'Revertido'
 export type PaymentMethod = 'Cartão' | 'Boleto' | 'PIX' | 'Transferência'
+export type YesNo = 'Sim' | 'Não'
+
+export interface ActionType {
+  id: string
+  name: string
+  active: boolean
+}
 
 export interface Consultant {
   id: string
   name: string
   role: string
   active: boolean
+  isAttendant: boolean
+  fixedRemuneration: number
+  participatesInAverages: boolean
+  averagesStartDate?: string
 }
 
 export interface Contract {
   id: string
   clientName: string
+  cpf: string
+  phone: string
+  email: string
   consultantId: string
-  date: string // ISO format
+  attendantId: string
+  actionTypeId: string
+  date: string
   value: number
   paymentMethod: PaymentMethod
   installments: number
   status: ContractStatus
+  downPaymentValue: number
+  downPaymentMethod: PaymentMethod
+  downPaymentStatus: YesNo
   cancellationDate?: string
   cancellationReason?: string
   internalFailure?: boolean

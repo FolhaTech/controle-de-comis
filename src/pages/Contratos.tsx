@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,13 +18,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
 import { format } from 'date-fns'
 import { Contract } from '@/lib/types'
 
 export default function Contratos() {
-  const { contracts, filter, consultants } = useAppStore()
+  const { contracts, filter, consultants, actionTypes, deleteContract } = useAppStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
@@ -38,6 +49,8 @@ export default function Contratos() {
 
   const getConsultantName = (id: string) =>
     consultants.find((c) => c.id === id)?.name || 'Desconhecido'
+
+  const getActionTypeName = (id: string) => actionTypes.find((a) => a.id === id)?.name || '—'
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -62,6 +75,10 @@ export default function Contratos() {
   const handleOpenNew = () => {
     setEditingContract(undefined)
     setIsDialogOpen(true)
+  }
+
+  const handleDelete = (id: string) => {
+    deleteContract(id)
   }
 
   return (
@@ -99,9 +116,10 @@ export default function Contratos() {
             <TableRow className="bg-secondary/40">
               <TableHead>Cliente</TableHead>
               <TableHead>Consultor</TableHead>
+              <TableHead className="hidden md:table-cell">Tipo de Ação</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead>Pgto/Parc.</TableHead>
+              <TableHead className="hidden lg:table-cell">Entrada</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -109,23 +127,38 @@ export default function Contratos() {
           <TableBody>
             {filteredContracts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Nenhum contrato encontrado para este período.
                 </TableCell>
               </TableRow>
             ) : (
               filteredContracts.map((contract) => (
                 <TableRow key={contract.id} className="hover:bg-secondary/20 transition-colors">
-                  <TableCell className="font-medium">{contract.clientName}</TableCell>
+                  <TableCell className="font-medium">
+                    {contract.clientName}
+                    <span className="text-[10px] block text-muted-foreground">{contract.cpf}</span>
+                  </TableCell>
                   <TableCell>{getConsultantName(contract.consultantId)}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {getActionTypeName(contract.actionTypeId)}
+                  </TableCell>
                   <TableCell>{format(new Date(contract.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell>
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                       contract.value,
                     )}
                   </TableCell>
-                  <TableCell>
-                    {contract.paymentMethod} ({contract.installments}x)
+                  <TableCell className="hidden lg:table-cell">
+                    {contract.downPaymentStatus === 'Sim' ? (
+                      <span className="text-sm text-success">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(contract.downPaymentValue)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(contract.status)}>
@@ -138,9 +171,46 @@ export default function Contratos() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(contract)}>
-                      Editar
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(contract)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir o contrato de{' '}
+                              <strong>{contract.clientName}</strong>? Esta ação não pode ser
+                              desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(contract.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

@@ -1,5 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, Users, Target, Settings, LogOut, Menu } from 'lucide-react'
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  Target,
+  Settings,
+  LogOut,
+  Menu,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -9,6 +18,7 @@ const navItems = [
   { icon: FileText, label: 'Contratos', path: '/contratos' },
   { icon: Users, label: 'Equipe', path: '/equipe' },
   { icon: Target, label: 'Quarter', path: '/quarter' },
+  { icon: SlidersHorizontal, label: 'Parâmetros', path: '/parametros' },
   { icon: Settings, label: 'Configurações', path: '/configuracoes' },
 ]
 
