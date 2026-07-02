@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Pencil, Phone } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -11,14 +11,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
 import { ConsultantForm } from './equipe/ConsultantForm'
 import { Consultant } from '@/lib/types'
+import { deleteTeamMember } from '@/services/team-members'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Equipe() {
   const { consultants } = useAppStore()
+  const [localConsultants, setLocalConsultants] = useState(consultants)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
+  const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    setLocalConsultants(consultants)
+  }, [consultants])
 
   const handleEdit = (consultant: Consultant) => {
     setEditingConsultant(consultant)
@@ -30,16 +50,38 @@ export default function Equipe() {
     setIsDialogOpen(true)
   }
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    const { error } = await deleteTeamMember(deleteTarget.id)
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o membro da equipe. Tente novamente.',
+      })
+      setIsDeleting(false)
+    } else {
+      setLocalConsultants((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      toast({
+        title: 'Membro excluído',
+        description: 'O membro da equipe foi excluído com sucesso.',
+      })
+      setIsDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-serif font-bold">Equipe Comercial</h2>
           <p className="text-muted-foreground">Gerencie os consultores e seus acessos.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleOpenNew} className="hidden sm:flex">
+            <Button onClick={handleOpenNew} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" /> Novo Membro
             </Button>
           </DialogTrigger>
@@ -57,24 +99,8 @@ export default function Equipe() {
         </Dialog>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button onClick={handleOpenNew} className="sm:hidden w-full">
-            <Plus className="mr-2 h-4 w-4" /> Novo Membro
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
-            </DialogTitle>
-          </DialogHeader>
-          <ConsultantForm consultant={editingConsultant} onSuccess={() => setIsDialogOpen(false)} />
-        </DialogContent>
-      </Dialog>
-
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {consultants.map((consultant) => (
+        {localConsultants.map((consultant) => (
           <Card key={consultant.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center space-y-0 gap-4">
               <Avatar className="h-12 w-12 border-2 border-primary/20">
@@ -132,19 +158,57 @@ export default function Equipe() {
                   )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => handleEdit(consultant)}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" /> Editar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEdit(consultant)}
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteTarget(consultant)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este membro da equipe? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteConfirm()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

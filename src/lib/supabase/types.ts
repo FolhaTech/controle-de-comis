@@ -1,17 +1,11 @@
 // AVOID UPDATING THIS FILE DIRECTLY. It is automatically generated.
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: '14.5'
   }
   public: {
     Tables: {
@@ -42,11 +36,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "attendance_extras_worker_id_fkey"
-            columns: ["worker_id"]
+            foreignKeyName: 'attendance_extras_worker_id_fkey'
+            columns: ['worker_id']
             isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
+            referencedRelation: 'team_members'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -74,11 +68,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "attendance_records_worker_id_fkey"
-            columns: ["worker_id"]
+            foreignKeyName: 'attendance_records_worker_id_fkey'
+            columns: ['worker_id']
             isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
+            referencedRelation: 'team_members'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -139,18 +133,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "compositions_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'compositions_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "compositions_service_id_fkey"
-            columns: ["service_id"]
+            foreignKeyName: 'compositions_service_id_fkey'
+            columns: ['service_id']
             isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
+            referencedRelation: 'services'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -181,18 +175,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "compositions_history_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'compositions_history_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "compositions_history_work_service_id_fkey"
-            columns: ["work_service_id"]
+            foreignKeyName: 'compositions_history_work_service_id_fkey'
+            columns: ['work_service_id']
             isOneToOne: false
-            referencedRelation: "work_services"
-            referencedColumns: ["id"]
+            referencedRelation: 'work_services'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -223,20 +217,50 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "consumption_tracking_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'consumption_tracking_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "consumption_tracking_work_service_id_fkey"
-            columns: ["work_service_id"]
+            foreignKeyName: 'consumption_tracking_work_service_id_fkey'
+            columns: ['work_service_id']
             isOneToOne: false
-            referencedRelation: "work_services"
-            referencedColumns: ["id"]
+            referencedRelation: 'work_services'
+            referencedColumns: ['id']
           },
         ]
+      }
+      dashboards: {
+        Row: {
+          created_at: string
+          display_time: number
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          display_time?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          url: string
+        }
+        Update: {
+          created_at?: string
+          display_time?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          url?: string
+        }
+        Relationships: []
       }
       densidades_insumo: {
         Row: {
@@ -265,13 +289,43 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "densidades_insumo_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'densidades_insumo_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
         ]
+      }
+      display_settings: {
+        Row: {
+          auto_refresh_on_switch: boolean
+          company_logo_url: string | null
+          created_at: string
+          default_rotation_time: number
+          id: string
+          show_clock: boolean
+          show_header: boolean
+        }
+        Insert: {
+          auto_refresh_on_switch?: boolean
+          company_logo_url?: string | null
+          created_at?: string
+          default_rotation_time?: number
+          id?: string
+          show_clock?: boolean
+          show_header?: boolean
+        }
+        Update: {
+          auto_refresh_on_switch?: boolean
+          company_logo_url?: string | null
+          created_at?: string
+          default_rotation_time?: number
+          id?: string
+          show_clock?: boolean
+          show_header?: boolean
+        }
+        Relationships: []
       }
       expenses: {
         Row: {
@@ -321,18 +375,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "expenses_manager_id_fkey"
-            columns: ["manager_id"]
+            foreignKeyName: 'expenses_manager_id_fkey'
+            columns: ['manager_id']
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "expenses_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'expenses_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -378,18 +432,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "external_contracts_provider_id_fkey"
-            columns: ["provider_id"]
+            foreignKeyName: 'external_contracts_provider_id_fkey'
+            columns: ['provider_id']
             isOneToOne: false
-            referencedRelation: "service_providers"
-            referencedColumns: ["id"]
+            referencedRelation: 'service_providers'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "external_contracts_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'external_contracts_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -429,25 +483,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "material_movements_author_id_fkey"
-            columns: ["author_id"]
+            foreignKeyName: 'material_movements_author_id_fkey'
+            columns: ['author_id']
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "material_movements_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'material_movements_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "material_movements_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'material_movements_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -502,11 +556,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "materials_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'materials_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -514,6 +568,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          email: string | null
           full_name: string
           id: string
           role: string | null
@@ -521,6 +576,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           full_name: string
           id: string
           role?: string | null
@@ -528,6 +584,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           full_name?: string
           id?: string
           role?: string | null
@@ -567,11 +624,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "revenues_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'revenues_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -620,11 +677,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "service_providers_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'service_providers_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -676,11 +733,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "team_member_documents_team_member_id_fkey"
-            columns: ["team_member_id"]
+            foreignKeyName: 'team_member_documents_team_member_id_fkey'
+            columns: ['team_member_id']
             isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
+            referencedRelation: 'team_members'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -729,11 +786,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "team_members_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'team_members_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -779,18 +836,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "work_diaries_author_id_fkey"
-            columns: ["author_id"]
+            foreignKeyName: 'work_diaries_author_id_fkey'
+            columns: ['author_id']
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "work_diaries_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'work_diaries_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -824,18 +881,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "work_extra_materials_material_id_fkey"
-            columns: ["material_id"]
+            foreignKeyName: 'work_extra_materials_material_id_fkey'
+            columns: ['material_id']
             isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
+            referencedRelation: 'materials'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "work_extra_materials_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'work_extra_materials_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -866,18 +923,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "work_services_service_id_fkey"
-            columns: ["service_id"]
+            foreignKeyName: 'work_services_service_id_fkey'
+            columns: ['service_id']
             isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
+            referencedRelation: 'services'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "work_services_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'work_services_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -923,11 +980,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "work_stages_work_id_fkey"
-            columns: ["work_id"]
+            foreignKeyName: 'work_stages_work_id_fkey'
+            columns: ['work_id']
             isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
+            referencedRelation: 'works'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -987,7 +1044,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -998,33 +1055,31 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1033,23 +1088,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1058,23 +1113,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1083,36 +1138,36 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+    | keyof DefaultSchema['Enums']
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
@@ -1120,4 +1175,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
