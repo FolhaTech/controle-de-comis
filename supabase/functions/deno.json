@@ -1,7 +1,7 @@
 {
   "_versions": {
     "parse-receipt": 4,
-    "generate-composition": 1,
+    "generate-composition": 2,
     "create-user": 1,
     "delete-user": 1
   }

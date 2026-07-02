@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,21 +24,15 @@ import {
 import useAppStore from '@/stores/useAppStore'
 import { ConsultantForm } from './equipe/ConsultantForm'
 import { Consultant } from '@/lib/types'
-import { deleteTeamMember } from '@/services/team-members'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Equipe() {
-  const { consultants } = useAppStore()
-  const [localConsultants, setLocalConsultants] = useState(consultants)
+  const { consultants, deleteConsultant } = useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
-
-  useEffect(() => {
-    setLocalConsultants(consultants)
-  }, [consultants])
 
   const handleEdit = (consultant: Consultant) => {
     setEditingConsultant(consultant)
@@ -53,23 +47,21 @@ export default function Equipe() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return
     setIsDeleting(true)
-    const { error } = await deleteTeamMember(deleteTarget.id)
+    const { error } = await deleteConsultant(deleteTarget.id)
     if (error) {
       toast({
         variant: 'destructive',
         title: 'Erro ao excluir',
-        description: 'Não foi possível excluir o membro da equipe. Tente novamente.',
+        description: 'Não foi possível excluir o membro da equipe.',
       })
-      setIsDeleting(false)
     } else {
-      setLocalConsultants((prev) => prev.filter((c) => c.id !== deleteTarget.id))
       toast({
         title: 'Membro excluído',
         description: 'O membro da equipe foi excluído com sucesso.',
       })
-      setIsDeleting(false)
-      setDeleteTarget(null)
     }
+    setIsDeleting(false)
+    setDeleteTarget(null)
   }
 
   return (
@@ -100,7 +92,7 @@ export default function Equipe() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {localConsultants.map((consultant) => (
+        {consultants.map((consultant) => (
           <Card key={consultant.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center space-y-0 gap-4">
               <Avatar className="h-12 w-12 border-2 border-primary/20">
@@ -114,24 +106,24 @@ export default function Equipe() {
               </Avatar>
               <div className="flex-1">
                 <CardTitle className="text-lg">{consultant.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">{consultant.role}</p>
+                <p className="text-sm text-muted-foreground">{consultant.role || '—'}</p>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <Badge
-                    variant={consultant.active ? 'default' : 'secondary'}
-                    className={consultant.active ? 'bg-success hover:bg-success' : ''}
+                    variant={consultant.status === 'active' ? 'default' : 'secondary'}
+                    className={consultant.status === 'active' ? 'bg-success hover:bg-success' : ''}
                   >
-                    {consultant.active ? 'Ativo' : 'Inativo'}
+                    {consultant.status === 'active' ? 'Ativo' : 'Inativo'}
                   </Badge>
-                  {consultant.isAttendant && (
+                  {consultant.type === 'atendente' && (
                     <Badge variant="outline" className="border-primary text-primary">
                       Atendente
                     </Badge>
                   )}
-                  {consultant.participatesInAverages && (
+                  {consultant.participates_in_averages && (
                     <Badge variant="outline" className="border-blue-500 text-blue-600">
                       Participa de Médias
                     </Badge>
@@ -145,14 +137,25 @@ export default function Equipe() {
                       {new Intl.NumberFormat('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
-                      }).format(consultant.fixedRemuneration)}
+                      }).format(consultant.fixed_salary || 0)}
                     </span>
                   </p>
-                  {consultant.participatesInAverages && consultant.averagesStartDate && (
+                  {consultant.phone && (
+                    <p className="text-muted-foreground">
+                      Telefone:{' '}
+                      <span className="font-medium text-foreground">{consultant.phone}</span>
+                    </p>
+                  )}
+                  {consultant.pix_key && (
+                    <p className="text-muted-foreground">
+                      PIX: <span className="font-medium text-foreground">{consultant.pix_key}</span>
+                    </p>
+                  )}
+                  {consultant.participates_in_averages && consultant.average_start_date && (
                     <p className="text-muted-foreground">
                       Início Médias:{' '}
                       <span className="font-medium text-foreground">
-                        {new Date(consultant.averagesStartDate).toLocaleDateString('pt-BR')}
+                        {new Date(consultant.average_start_date).toLocaleDateString('pt-BR')}
                       </span>
                     </p>
                   )}

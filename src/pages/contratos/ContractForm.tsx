@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -19,34 +20,36 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import useAppStore from '@/stores/useAppStore'
 import { Contract } from '@/lib/types'
+import { useToast } from '@/hooks/use-toast'
 
 const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$|^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/
 
 const formSchema = z.object({
-  clientName: z.string().min(2, 'Nome muito curto'),
-  cpf: z
+  client: z.string().min(2, 'Nome muito curto'),
+  client_cpf: z
     .string()
     .min(1, 'CPF obrigatório')
     .refine((val) => cpfRegex.test(val), 'Formato inválido'),
-  phone: z.string().min(8, 'Telefone inválido'),
-  email: z.string().email('E-mail inválido'),
-  consultantId: z.string().min(1, 'Selecione um consultor'),
-  attendantId: z.string().min(1, 'Selecione um atendente'),
-  actionTypeId: z.string().min(1, 'Selecione um tipo de ação'),
-  date: z.string().min(1, 'Data obrigatória'),
-  value: z.coerce.number().min(1, 'Valor deve ser maior que 0'),
-  paymentMethod: z.enum(['Cartão', 'Boleto', 'PIX', 'Transferência']),
+  client_phone: z.string().min(8, 'Telefone inválido'),
+  client_email: z.string().email('E-mail inválido'),
+  consultant_id: z.string().min(1, 'Selecione um consultor'),
+  pre_processual_agent_id: z.string().min(1, 'Selecione um atendente'),
+  service_type: z.string().min(1, 'Selecione um tipo de ação'),
+  start_date: z.string().min(1, 'Data obrigatória'),
+  contracted_value: z.coerce.number().min(1, 'Valor deve ser maior que 0'),
+  payment_method: z.enum(['Cartão', 'Boleto', 'PIX', 'Transferência']),
   installments: z.coerce.number().min(1).max(24),
   status: z.enum(['Ativo', 'Cancelado', 'Distrato Pendente', 'Revertido']),
-  downPaymentValue: z.coerce.number().min(0),
-  downPaymentMethod: z.enum(['Cartão', 'Boleto', 'PIX', 'Transferência']),
-  downPaymentStatus: z.enum(['Sim', 'Não']),
-  cancellationDate: z.string().optional(),
-  cancellationReason: z.string().optional(),
-  internalFailure: z.boolean().default(false),
+  entry_value: z.coerce.number().min(0),
+  entry_payment_method: z.enum(['Cartão', 'Boleto', 'PIX', 'Transferência']),
+  is_entry_paid: z.boolean(),
+  cancellation_date: z.string().optional(),
+  cancellation_reason: z.string().optional(),
+  internal_failure: z.boolean().default(false),
 })
 
 interface ContractFormProps {
@@ -56,41 +59,84 @@ interface ContractFormProps {
 
 export function ContractForm({ contract, onSuccess }: ContractFormProps) {
   const { consultants, actionTypes, addContract, updateContract } = useAppStore()
+  const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const attendants = consultants.filter((c) => c.isAttendant && c.active)
-  const salesConsultants = consultants.filter((c) => !c.isAttendant && c.active)
+  const attendants = consultants.filter((c) => c.type === 'atendente' && c.status === 'active')
+  const salesConsultants = consultants.filter(
+    (c) => c.type !== 'atendente' && c.status === 'active',
+  )
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: contract || {
-      clientName: '',
-      cpf: '',
-      phone: '',
-      email: '',
-      consultantId: '',
-      attendantId: '',
-      actionTypeId: '',
-      date: new Date().toISOString().split('T')[0],
-      value: 0,
-      paymentMethod: 'Cartão',
-      installments: 1,
-      status: 'Ativo',
-      downPaymentValue: 0,
-      downPaymentMethod: 'Cartão',
-      downPaymentStatus: 'Não',
-      internalFailure: false,
-    },
+    defaultValues: contract
+      ? {
+          client: contract.client || '',
+          client_cpf: contract.client_cpf || '',
+          client_phone: contract.client_phone || '',
+          client_email: contract.client_email || '',
+          consultant_id: contract.consultant_id || '',
+          pre_processual_agent_id: contract.pre_processual_agent_id || '',
+          service_type: contract.service_type || '',
+          start_date: contract.start_date || '',
+          contracted_value: contract.contracted_value || 0,
+          payment_method:
+            (contract.payment_method as 'Cartão' | 'Boleto' | 'PIX' | 'Transferência') || 'Cartão',
+          installments: contract.installments || 1,
+          status:
+            (contract.status as 'Ativo' | 'Cancelado' | 'Distrato Pendente' | 'Revertido') ||
+            'Ativo',
+          entry_value: contract.entry_value || 0,
+          entry_payment_method:
+            (contract.entry_payment_method as 'Cartão' | 'Boleto' | 'PIX' | 'Transferência') ||
+            'Cartão',
+          is_entry_paid: contract.is_entry_paid || false,
+          cancellation_date: contract.cancellation_date || '',
+          cancellation_reason: contract.cancellation_reason || '',
+          internal_failure: contract.internal_failure || false,
+        }
+      : {
+          client: '',
+          client_cpf: '',
+          client_phone: '',
+          client_email: '',
+          consultant_id: '',
+          pre_processual_agent_id: '',
+          service_type: '',
+          start_date: new Date().toISOString().split('T')[0],
+          contracted_value: 0,
+          payment_method: 'Cartão',
+          installments: 1,
+          status: 'Ativo',
+          entry_value: 0,
+          entry_payment_method: 'Cartão',
+          is_entry_paid: false,
+          internal_failure: false,
+        },
   })
 
   const status = form.watch('status')
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true)
     if (contract) {
-      updateContract(contract.id, values)
+      const { error } = await updateContract(contract.id, values)
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar.' })
+      } else {
+        toast({ title: 'Contrato atualizado' })
+        onSuccess()
+      }
     } else {
-      addContract(values)
+      const { error } = await addContract(values)
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível criar.' })
+      } else {
+        toast({ title: 'Contrato criado' })
+        onSuccess()
+      }
     }
-    onSuccess()
+    setIsSubmitting(false)
   }
 
   return (
@@ -99,7 +145,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <h3 className="text-sm font-semibold text-primary">Dados do Cliente</h3>
         <FormField
           control={form.control}
-          name="clientName"
+          name="client"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nome do Cliente</FormLabel>
@@ -114,7 +160,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name="cpf"
+            name="client_cpf"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>CPF / CNPJ</FormLabel>
@@ -127,7 +173,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="phone"
+            name="client_phone"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Telefone</FormLabel>
@@ -140,7 +186,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="email"
+            name="client_email"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>E-mail</FormLabel>
@@ -159,7 +205,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name="consultantId"
+            name="consultant_id"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Consultor</FormLabel>
@@ -183,7 +229,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="attendantId"
+            name="pre_processual_agent_id"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Atendente Pré-processual</FormLabel>
@@ -207,7 +253,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="actionTypeId"
+            name="service_type"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Tipo de Ação</FormLabel>
@@ -239,7 +285,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="date"
+            name="start_date"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Data do Contrato</FormLabel>
@@ -278,7 +324,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <div className="grid grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name="value"
+            name="contracted_value"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Valor (R$)</FormLabel>
@@ -291,7 +337,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="paymentMethod"
+            name="payment_method"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Pagamento</FormLabel>
@@ -333,7 +379,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name="downPaymentValue"
+            name="entry_value"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Valor da Entrada (R$)</FormLabel>
@@ -346,7 +392,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="downPaymentMethod"
+            name="entry_payment_method"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Forma de Pagamento</FormLabel>
@@ -369,22 +415,13 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           />
           <FormField
             control={form.control}
-            name="downPaymentStatus"
+            name="is_entry_paid"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Pago?</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="Sim">Sim</SelectItem>
-                    <SelectItem value="Não">Não</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
+              <FormItem className="flex flex-row items-center justify-between rounded-md p-3 border">
+                <FormLabel>Entrada Paga?</FormLabel>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
               </FormItem>
             )}
           />
@@ -396,7 +433,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="cancellationDate"
+                name="cancellation_date"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Data</FormLabel>
@@ -409,7 +446,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
               />
               <FormField
                 control={form.control}
-                name="cancellationReason"
+                name="cancellation_reason"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Motivo</FormLabel>
@@ -423,7 +460,7 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
             </div>
             <FormField
               control={form.control}
-              name="internalFailure"
+              name="internal_failure"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-2 shadow-sm border bg-white">
                   <FormControl>
@@ -441,8 +478,8 @@ export function ContractForm({ contract, onSuccess }: ContractFormProps) {
           </div>
         )}
 
-        <Button type="submit" className="w-full mt-4">
-          Salvar Contrato
+        <Button type="submit" className="w-full mt-4" disabled={isSubmitting}>
+          {isSubmitting ? 'Salvando...' : 'Salvar Contrato'}
         </Button>
       </form>
     </Form>

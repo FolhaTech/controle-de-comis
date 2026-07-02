@@ -1,6 +1,51 @@
-import React, { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { Contract, Consultant, Settings, FilterContext, ActionType } from '@/lib/types'
-import { mockConsultants, mockContracts, mockSettings, mockActionTypes } from '@/lib/mock-data'
+import {
+  fetchTeamMembers,
+  createTeamMember,
+  updateTeamMember,
+  deleteTeamMember,
+} from '@/services/team-members'
+import {
+  fetchContracts,
+  createContract,
+  updateContract,
+  deleteContract,
+} from '@/services/contracts'
+import {
+  fetchActionTypes,
+  createActionType,
+  updateActionType,
+  deleteActionType,
+} from '@/services/action-types'
+
+const defaultSettings: Settings = {
+  goals: {
+    individualContracts: 50,
+    individualValue: 135000,
+    groupContracts: 200,
+    groupValue: 540000,
+    ticketMedio: 2700,
+  },
+  tiers: [
+    { min: 10, max: 29, percentage: 2.5 },
+    { min: 30, max: 36, percentage: 5.0 },
+    { min: 37, max: 49, percentage: 6.0 },
+    { min: 50, max: 999, percentage: 10.0 },
+  ],
+  bonuses: {
+    highValueThreshold: 3000,
+    highValuePercentage: 1.0,
+    maxInstallments: 12,
+    installmentsPercentage: 2.0,
+  },
+  quarterTiers: [
+    { contracts: 105, award: 1250 },
+    { contracts: 120, award: 1625 },
+    { contracts: 150, award: 2500 },
+  ],
+  ipca: { year: 2025, value: 4.83, appliedPercentage: 70 },
+}
 
 interface AppStoreState {
   contracts: Contract[]
@@ -8,71 +53,102 @@ interface AppStoreState {
   settings: Settings
   filter: FilterContext
   actionTypes: ActionType[]
-  addContract: (contract: Omit<Contract, 'id' | 'createdAt'>) => void
-  updateContract: (id: string, contract: Partial<Contract>) => void
-  deleteContract: (id: string) => void
-  addConsultant: (consultant: Omit<Consultant, 'id'>) => void
-  updateConsultant: (id: string, consultant: Partial<Consultant>) => void
-  addActionType: (actionType: Omit<ActionType, 'id'>) => void
-  updateActionType: (id: string, actionType: Partial<ActionType>) => void
-  deleteActionType: (id: string) => void
+  fetchConsultants: () => Promise<void>
+  fetchContracts: () => Promise<void>
+  fetchActionTypes: () => Promise<void>
+  addContract: (contract: Partial<Contract>) => Promise<{ error: unknown }>
+  updateContract: (id: string, updates: Partial<Contract>) => Promise<{ error: unknown }>
+  deleteContract: (id: string) => Promise<{ error: unknown }>
+  addConsultant: (member: Partial<Consultant>) => Promise<{ error: unknown }>
+  updateConsultant: (id: string, updates: Partial<Consultant>) => Promise<{ error: unknown }>
+  deleteConsultant: (id: string) => Promise<{ error: unknown }>
+  addActionType: (actionType: { name: string; active: boolean }) => Promise<{ error: unknown }>
+  updateActionType: (id: string, updates: Partial<ActionType>) => Promise<{ error: unknown }>
+  deleteActionType: (id: string) => Promise<{ error: unknown }>
   updateSettings: (settings: Partial<Settings>) => void
   setFilter: (filter: Partial<FilterContext>) => void
 }
 
 const AppContext = createContext<AppStoreState | null>(null)
 
-const generateId = () => Math.random().toString(36).substr(2, 9)
-
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [contracts, setContracts] = useState<Contract[]>(mockContracts)
-  const [consultants, setConsultants] = useState<Consultant[]>(mockConsultants)
-  const [settings, setSettings] = useState<Settings>(mockSettings)
-  const [actionTypes, setActionTypes] = useState<ActionType[]>(mockActionTypes)
-
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [consultants, setConsultants] = useState<Consultant[]>([])
+  const [actionTypes, setActionTypes] = useState<ActionType[]>([])
+  const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [filter, setFilterState] = useState<FilterContext>({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
   })
 
-  const addContract = (contractData: Omit<Contract, 'id' | 'createdAt'>) => {
-    const newContract: Contract = {
-      ...contractData,
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-    }
-    setContracts((prev) => [newContract, ...prev])
-  }
+  const fetchConsultants = useCallback(async () => {
+    const { data, error } = await fetchTeamMembers()
+    if (!error && data) setConsultants(data)
+  }, [])
 
-  const updateContract = (id: string, data: Partial<Contract>) => {
-    setContracts((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
-  }
+  const fetchContracts = useCallback(async () => {
+    const { data, error } = await fetchContracts()
+    if (!error && data) setContracts(data)
+  }, [])
 
-  const deleteContract = (id: string) => {
-    setContracts((prev) => prev.filter((c) => c.id !== id))
-  }
+  const fetchActionTypes = useCallback(async () => {
+    const { data, error } = await fetchActionTypes()
+    if (!error && data) setActionTypes(data)
+  }, [])
 
-  const addConsultant = (consultantData: Omit<Consultant, 'id'>) => {
-    const newConsultant: Consultant = { ...consultantData, id: generateId() }
-    setConsultants((prev) => [...prev, newConsultant])
-  }
+  const addContract = useCallback(async (contract: Partial<Contract>) => {
+    const { data, error } = await createContract(contract)
+    if (!error && data) setContracts((prev) => [data, ...prev])
+    return { error }
+  }, [])
 
-  const updateConsultant = (id: string, data: Partial<Consultant>) => {
-    setConsultants((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
-  }
+  const updateContractRow = useCallback(async (id: string, updates: Partial<Contract>) => {
+    const { data, error } = await updateContract(id, updates)
+    if (!error && data) setContracts((prev) => prev.map((c) => (c.id === id ? data : c)))
+    return { error }
+  }, [])
 
-  const addActionType = (actionTypeData: Omit<ActionType, 'id'>) => {
-    const newActionType: ActionType = { ...actionTypeData, id: generateId() }
-    setActionTypes((prev) => [...prev, newActionType])
-  }
+  const deleteContractRow = useCallback(async (id: string) => {
+    const { error } = await deleteContract(id)
+    if (!error) setContracts((prev) => prev.filter((c) => c.id !== id))
+    return { error }
+  }, [])
 
-  const updateActionType = (id: string, data: Partial<ActionType>) => {
-    setActionTypes((prev) => prev.map((a) => (a.id === id ? { ...a, ...data } : a)))
-  }
+  const addConsultant = useCallback(async (member: Partial<Consultant>) => {
+    const { data, error } = await createTeamMember(member)
+    if (!error && data) setConsultants((prev) => [data, ...prev])
+    return { error }
+  }, [])
 
-  const deleteActionType = (id: string) => {
-    setActionTypes((prev) => prev.filter((a) => a.id !== id))
-  }
+  const updateConsultant = useCallback(async (id: string, updates: Partial<Consultant>) => {
+    const { data, error } = await updateTeamMember(id, updates)
+    if (!error && data) setConsultants((prev) => prev.map((c) => (c.id === id ? data : c)))
+    return { error }
+  }, [])
+
+  const deleteConsultant = useCallback(async (id: string) => {
+    const { error } = await deleteTeamMember(id)
+    if (!error) setConsultants((prev) => prev.filter((c) => c.id !== id))
+    return { error }
+  }, [])
+
+  const addActionType = useCallback(async (actionType: { name: string; active: boolean }) => {
+    const { data, error } = await createActionType(actionType)
+    if (!error && data) setActionTypes((prev) => [...prev, data])
+    return { error }
+  }, [])
+
+  const updateActionType = useCallback(async (id: string, updates: Partial<ActionType>) => {
+    const { data, error } = await updateActionType(id, updates)
+    if (!error && data) setActionTypes((prev) => prev.map((a) => (a.id === id ? data : a)))
+    return { error }
+  }, [])
+
+  const deleteActionType = useCallback(async (id: string) => {
+    const { error } = await deleteActionType(id)
+    if (!error) setActionTypes((prev) => prev.filter((a) => a.id !== id))
+    return { error }
+  }, [])
 
   const updateSettings = (newSettings: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }))
@@ -82,28 +158,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFilterState((prev) => ({ ...prev, ...newFilter }))
   }
 
-  return React.createElement(
-    AppContext.Provider,
-    {
-      value: {
+  return (
+    <AppContext.Provider
+      value={{
         contracts,
         consultants,
         settings,
         filter,
         actionTypes,
+        fetchConsultants,
+        fetchContracts,
+        fetchActionTypes,
         addContract,
-        updateContract,
-        deleteContract,
+        updateContract: updateContractRow,
+        deleteContract: deleteContractRow,
         addConsultant,
         updateConsultant,
+        deleteConsultant,
         addActionType,
         updateActionType,
         deleteActionType,
         updateSettings,
         setFilter,
-      },
-    },
-    children,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   )
 }
 

@@ -1,0 +1,14 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS client_cpf text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS client_email text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS client_phone text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS consultant_id uuid REFERENCES public.team_members(id);
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS pre_processual_agent_id uuid REFERENCES public.team_members(id);
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS service_type uuid REFERENCES public.action_types(id);
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS payment_method text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS installments integer DEFAULT 1;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS entry_value numeric DEFAULT 0;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS entry_payment_method text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS is_entry_paid boolean DEFAULT false;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS cancellation_date date;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS cancellation_reason text;
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS internal_failure boolean DEFAULT false;

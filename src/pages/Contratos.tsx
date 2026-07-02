@@ -33,26 +33,29 @@ import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
 import { format } from 'date-fns'
 import { Contract } from '@/lib/types'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Contratos() {
   const { contracts, filter, consultants, actionTypes, deleteContract } = useAppStore()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
 
   const filteredContracts = contracts.filter((c) => {
-    const d = new Date(c.date)
+    if (!c.start_date) return false
+    const d = new Date(c.start_date)
     const matchesPeriod = d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year
-    const matchesSearch = c.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (c.client || '').toLowerCase().includes(searchTerm.toLowerCase())
     return matchesPeriod && matchesSearch
   })
 
-  const getConsultantName = (id: string) =>
+  const getConsultantName = (id: string | null) =>
     consultants.find((c) => c.id === id)?.name || 'Desconhecido'
 
-  const getActionTypeName = (id: string) => actionTypes.find((a) => a.id === id)?.name || '—'
+  const getActionTypeName = (id: string | null) => actionTypes.find((a) => a.id === id)?.name || '—'
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'Ativo':
         return 'bg-success/15 text-success hover:bg-success/25'
@@ -77,8 +80,13 @@ export default function Contratos() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    deleteContract(id)
+  const handleDelete = async (id: string) => {
+    const { error } = await deleteContract(id)
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.' })
+    } else {
+      toast({ title: 'Contrato excluído' })
+    }
   }
 
   return (
@@ -135,26 +143,33 @@ export default function Contratos() {
               filteredContracts.map((contract) => (
                 <TableRow key={contract.id} className="hover:bg-secondary/20 transition-colors">
                   <TableCell className="font-medium">
-                    {contract.clientName}
-                    <span className="text-[10px] block text-muted-foreground">{contract.cpf}</span>
+                    {contract.client || '—'}
+                    <span className="text-[10px] block text-muted-foreground">
+                      {contract.client_cpf || ''}
+                    </span>
                   </TableCell>
-                  <TableCell>{getConsultantName(contract.consultantId)}</TableCell>
+                  <TableCell>{getConsultantName(contract.consultant_id)}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {getActionTypeName(contract.actionTypeId)}
+                    {getActionTypeName(contract.service_type)}
                   </TableCell>
-                  <TableCell>{format(new Date(contract.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell>
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                      contract.value,
-                    )}
+                    {contract.start_date
+                      ? format(new Date(contract.start_date), 'dd/MM/yyyy')
+                      : '—'}
+                  </TableCell>
+                  <TableCell>
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(contract.contracted_value || 0)}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
-                    {contract.downPaymentStatus === 'Sim' ? (
+                    {contract.is_entry_paid ? (
                       <span className="text-sm text-success">
                         {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
-                        }).format(contract.downPaymentValue)}
+                        }).format(contract.entry_value || 0)}
                       </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
@@ -162,9 +177,9 @@ export default function Contratos() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(contract.status)}>
-                      {contract.status}
+                      {contract.status || '—'}
                     </Badge>
-                    {contract.status === 'Cancelado' && contract.internalFailure && (
+                    {contract.status === 'Cancelado' && contract.internal_failure && (
                       <span className="text-[10px] block text-muted-foreground mt-1">
                         Falha Interna
                       </span>
@@ -195,8 +210,7 @@ export default function Contratos() {
                             <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
                             <AlertDialogDescription>
                               Tem certeza que deseja excluir o contrato de{' '}
-                              <strong>{contract.clientName}</strong>? Esta ação não pode ser
-                              desfeita.
+                              <strong>{contract.client}</strong>? Esta ação não pode ser desfeita.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
