@@ -50,10 +50,11 @@ const defaultSettings: Settings = {
 interface AppStoreState {
   contracts: Contract[]
   consultants: Consultant[]
+  consultantsLoading: boolean
   settings: Settings
   filter: FilterContext
   actionTypes: ActionType[]
-  fetchConsultants: () => Promise<void>
+  fetchConsultants: () => Promise<{ error: unknown }>
   fetchContracts: () => Promise<void>
   fetchActionTypes: () => Promise<void>
   addContract: (contract: Partial<Contract>) => Promise<{ error: unknown }>
@@ -74,6 +75,7 @@ const AppContext = createContext<AppStoreState | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [consultants, setConsultants] = useState<Consultant[]>([])
+  const [consultantsLoading, setConsultantsLoading] = useState(false)
   const [actionTypes, setActionTypes] = useState<ActionType[]>([])
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [filter, setFilterState] = useState<FilterContext>({
@@ -82,8 +84,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   })
 
   const fetchConsultants = useCallback(async () => {
+    setConsultantsLoading(true)
     const { data, error } = await fetchTeamMembers()
     if (!error && data) setConsultants(data)
+    setConsultantsLoading(false)
+    return { error }
   }, [])
 
   const fetchContracts = useCallback(async () => {
@@ -163,6 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         contracts,
         consultants,
+        consultantsLoading,
         settings,
         filter,
         actionTypes,

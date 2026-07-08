@@ -24,6 +24,7 @@ export interface Consultant {
   work_id: string | null
   daily_cost: number | null
   created_at: string | null
+  work_name?: string | null
 }
 
 export interface Contract {

@@ -1,9 +1,17 @@
-import { useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -26,13 +34,67 @@ import { ConsultantForm } from './equipe/ConsultantForm'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+})
+
+const dateFormatter = new Intl.DateTimeFormat('pt-BR')
+
+function formatPaymentType(type: string | null): string {
+  switch (type) {
+    case 'daily':
+      return 'Diário'
+    case 'monthly':
+      return 'Mensal'
+    default:
+      return type || '—'
+  }
+}
+
+function formatStatus(status: string | null): {
+  label: string
+  variant: 'default' | 'secondary'
+  className: string
+} {
+  if (status === 'active') {
+    return { label: 'Ativo', variant: 'default', className: 'bg-success hover:bg-success' }
+  }
+  return { label: 'Inativo', variant: 'secondary', className: '' }
+}
+
+function formatType(type: string | null): string {
+  switch (type) {
+    case 'atendente':
+      return 'Atendente'
+    case 'consultor':
+      return 'Consultor'
+    default:
+      return type || '—'
+  }
+}
+
 export default function Equipe() {
-  const { consultants, deleteConsultant } = useAppStore()
+  const { consultants, consultantsLoading, fetchConsultants, deleteConsultant } = useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
+
+  useEffect(() => {
+    const load = async () => {
+      const { error } = await fetchConsultants()
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao carregar',
+          description: 'Não foi possível carregar os membros da equipe.',
+        })
+      }
+    }
+    load()
+  }, [fetchConsultants, toast])
 
   const handleEdit = (consultant: Consultant) => {
     setEditingConsultant(consultant)
@@ -91,98 +153,163 @@ export default function Equipe() {
         </Dialog>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {consultants.map((consultant) => (
-          <Card key={consultant.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center space-y-0 gap-4">
-              <Avatar className="h-12 w-12 border-2 border-primary/20">
-                <AvatarFallback className="bg-primary text-primary-foreground font-serif">
-                  {consultant.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .substring(0, 2)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <CardTitle className="text-lg">{consultant.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">{consultant.role || '—'}</p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant={consultant.status === 'active' ? 'default' : 'secondary'}
-                    className={consultant.status === 'active' ? 'bg-success hover:bg-success' : ''}
-                  >
-                    {consultant.status === 'active' ? 'Ativo' : 'Inativo'}
-                  </Badge>
-                  {consultant.type === 'atendente' && (
-                    <Badge variant="outline" className="border-primary text-primary">
-                      Atendente
-                    </Badge>
-                  )}
-                  {consultant.participates_in_averages && (
-                    <Badge variant="outline" className="border-blue-500 text-blue-600">
-                      Participa de Médias
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="text-sm space-y-1">
-                  <p className="text-muted-foreground">
-                    Remuneração Fixa:{' '}
-                    <span className="font-medium text-foreground">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(consultant.fixed_salary || 0)}
-                    </span>
-                  </p>
-                  {consultant.phone && (
-                    <p className="text-muted-foreground">
-                      Telefone:{' '}
-                      <span className="font-medium text-foreground">{consultant.phone}</span>
+      <div className="bg-white rounded-xl shadow-subtle border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-secondary/40">
+              <TableHead>Nome</TableHead>
+              <TableHead className="hidden md:table-cell">Cargo</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Tipo</TableHead>
+              <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
+              <TableHead>Remuneração</TableHead>
+              <TableHead className="hidden xl:table-cell">Telefone</TableHead>
+              <TableHead className="hidden xl:table-cell">PIX</TableHead>
+              <TableHead className="hidden lg:table-cell">Admissão</TableHead>
+              <TableHead className="hidden xl:table-cell">Projeto</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {consultantsLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  <TableCell>
+                    <Skeleton className="h-5 w-32" />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16" />
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <Skeleton className="h-5 w-20" />
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <Skeleton className="h-5 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    <Skeleton className="h-5 w-28" />
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    <Skeleton className="h-5 w-28" />
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-8 w-16 ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : consultants.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={11} className="text-center py-12">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <Users className="h-10 w-10 opacity-40" />
+                    <p className="font-medium">Nenhum membro da equipe encontrado</p>
+                    <p className="text-sm">
+                      Clique em "Novo Membro" para adicionar o primeiro consultor.
                     </p>
-                  )}
-                  {consultant.pix_key && (
-                    <p className="text-muted-foreground">
-                      PIX: <span className="font-medium text-foreground">{consultant.pix_key}</span>
-                    </p>
-                  )}
-                  {consultant.participates_in_averages && consultant.average_start_date && (
-                    <p className="text-muted-foreground">
-                      Início Médias:{' '}
-                      <span className="font-medium text-foreground">
-                        {new Date(consultant.average_start_date).toLocaleDateString('pt-BR')}
-                      </span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleEdit(consultant)}
-                  >
-                    <Pencil className="mr-2 h-3.5 w-3.5" /> Editar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setDeleteTarget(consultant)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              consultants.map((consultant) => {
+                const statusInfo = formatStatus(consultant.status)
+                return (
+                  <TableRow key={consultant.id} className="hover:bg-secondary/20 transition-colors">
+                    <TableCell className="font-medium">{consultant.name}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {consultant.role || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusInfo.variant} className={statusInfo.className}>
+                        {statusInfo.label}
+                      </Badge>
+                      {consultant.participates_in_averages && (
+                        <Badge
+                          variant="outline"
+                          className="ml-1 border-blue-500 text-blue-600 text-[10px]"
+                        >
+                          Médias
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {formatType(consultant.type)}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {formatPaymentType(consultant.payment_type)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {consultant.payment_type === 'monthly' || consultant.fixed_salary
+                        ? currencyFormatter.format(consultant.fixed_salary || 0)
+                        : currencyFormatter.format(consultant.daily_cost || 0)}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
+                      {consultant.phone || '—'}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
+                      {consultant.pix_key || '—'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {consultant.admission_date
+                        ? dateFormatter.format(new Date(consultant.admission_date))
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
+                      {consultant.work_name || '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEdit(consultant)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteTarget(consultant)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      {!consultantsLoading && consultants.length > 0 && (
+        <Card className="bg-secondary/30">
+          <CardContent className="py-3 px-4">
+            <p className="text-xs text-muted-foreground flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {consultants.length}{' '}
+              {consultants.length === 1 ? 'membro cadastrado' : 'membros cadastrados'}
+              {consultants.filter((c) => c.status === 'active').length > 0 && (
+                <span>· {consultants.filter((c) => c.status === 'active').length} ativos</span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog
         open={!!deleteTarget}
@@ -194,7 +321,8 @@ export default function Equipe() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este membro da equipe? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir <strong>{deleteTarget?.name}</strong>? Esta ação não
+              pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
