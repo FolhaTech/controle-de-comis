@@ -5,12 +5,22 @@ import { filterContractsByPeriod, calculateMetrics, calculateCommission } from '
 import { MetricCards } from './dashboard/MetricCards'
 import { ProgressCharts } from './dashboard/ProgressCharts'
 import { RecentActivity } from './dashboard/RecentActivity'
+import { ContractsSummaryTable } from './dashboard/ContractsSummaryTable'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Index() {
-  const { contracts, consultants, filter, settings, contractsLoading, consultantsLoading } =
-    useAppStore()
+  const {
+    contracts,
+    consultants,
+    filter,
+    settings,
+    contractsLoading,
+    consultantsLoading,
+    contractsError,
+  } = useAppStore()
   const [hasPendingAlert, setHasPendingAlert] = useState(false)
+  const { toast } = useToast()
 
   const loading = contractsLoading || consultantsLoading
 
@@ -25,6 +35,16 @@ export default function Index() {
     contracts.length > 0
       ? contracts.reduce((sum, c) => sum + (c.progress_percentage || 0), 0) / contracts.length
       : 0
+
+  useEffect(() => {
+    if (contractsError) {
+      toast({
+        title: 'Erro de Conexão',
+        description: contractsError,
+        variant: 'destructive',
+      })
+    }
+  }, [contractsError, toast])
 
   useEffect(() => {
     const hasOldPending = contracts.some((c) => {
@@ -68,6 +88,8 @@ export default function Index() {
         ticketMedioGoal={settings.goals.ticketMedio}
         loading={loading}
       />
+
+      <ContractsSummaryTable contracts={contracts} loading={contractsLoading} />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-2">

@@ -50,6 +50,7 @@ const defaultSettings: Settings = {
 interface AppStoreState {
   contracts: Contract[]
   contractsLoading: boolean
+  contractsError: string | null
   consultants: Consultant[]
   consultantsLoading: boolean
   actionTypes: ActionType[]
@@ -78,6 +79,7 @@ const AppContext = createContext<AppStoreState | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [contractsLoading, setContractsLoading] = useState(false)
+  const [contractsError, setContractsError] = useState<string | null>(null)
   const [consultants, setConsultants] = useState<Consultant[]>([])
   const [consultantsLoading, setConsultantsLoading] = useState(false)
   const [actionTypes, setActionTypes] = useState<ActionType[]>([])
@@ -98,7 +100,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchContractsAction = useCallback(async () => {
     setContractsLoading(true)
+    setContractsError(null)
     const { data, error } = await fetchContracts()
+    if (error) {
+      setContractsError('Não foi possível carregar os contratos. Verifique sua conexão.')
+    }
     if (!error && data) setContracts(data)
     setContractsLoading(false)
   }, [])
@@ -181,6 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         contracts,
         contractsLoading,
+        contractsError,
         consultants,
         consultantsLoading,
         actionTypes,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -76,6 +77,7 @@ export default function Quarter() {
   const [contracts, setContracts] = useState<QuarterContract[]>([])
   const [totalValue, setTotalValue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
@@ -91,7 +93,7 @@ export default function Quarter() {
     }
 
     try {
-      const { data: viewData } = await supabase
+      const { data: viewData, error: viewError } = await supabase
         .from('vw_formas_pagamentos')
         .select(
           'id, name, client, contracted_value, entry_value, entry_payment_method, installments, status, start_date, end_date_planned, internal_failure',
@@ -99,6 +101,8 @@ export default function Quarter() {
         .gte('start_date', startDate)
         .lt('start_date', nextStartDate)
         .order('start_date', { ascending: false })
+
+      if (viewError) throw viewError
 
       const validContracts = (viewData || []).filter((c) => {
         if (c.status === 'Cancelado' && !c.internal_failure) return false
@@ -110,6 +114,11 @@ export default function Quarter() {
     } catch {
       setContracts([])
       setTotalValue(0)
+      toast({
+        title: 'Erro de Conexão',
+        description: 'Não foi possível carregar os contratos. Verifique sua conexão.',
+        variant: 'destructive',
+      })
     }
 
     setLoading(false)
