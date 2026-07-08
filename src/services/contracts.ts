@@ -5,8 +5,10 @@ export async function fetchContracts() {
   const { data, error } = await supabase
     .from('vw_formas_pagamentos')
     .select('*')
-    .order('created_at', { ascending: false })
-  return { data: (data as Contract[] | null) ?? null, error }
+    .order('created_at', { ascending: false, nullsFirst: false })
+  const contracts = (data as Contract[] | null) ?? null
+  const filtered = contracts?.filter((c) => c.id != null) ?? null
+  return { data: filtered, error }
 }
 
 export async function createContract(contract: Partial<Contract>) {

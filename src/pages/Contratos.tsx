@@ -84,12 +84,12 @@ export default function Contratos() {
     }
   }, [fetchContracts])
 
-  const filteredContracts = contracts.filter((c) => {
+  const filteredContracts = (contracts ?? []).filter((c) => {
     const matchesSearch =
-      (c.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (c?.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     if (viewMode === 'all') return matchesSearch
-    if (!c.start_date) return false
+    if (!c?.start_date) return false
     const d = new Date(c.start_date)
     return d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year && matchesSearch
   })
@@ -238,8 +238,11 @@ export default function Contratos() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredContracts.map((contract) => (
-                <TableRow key={contract.id} className="hover:bg-secondary/20 transition-colors">
+              filteredContracts.map((contract, index) => (
+                <TableRow
+                  key={contract.id ?? `${contract.name}-${index}`}
+                  className="hover:bg-secondary/20 transition-colors"
+                >
                   <TableCell className="font-medium">
                     <div className="flex items-start gap-1.5">
                       <div>
