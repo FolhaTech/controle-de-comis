@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import type { Process, ProcessStats, PaginatedProcesses } from '@/lib/processos'
+import type { Process, ProcessStats, PaginatedProcesses, QuarterData } from '@/lib/processos'
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processos`
 const API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string
@@ -48,5 +48,17 @@ export async function fetchProcessStats(): Promise<ProcessStats> {
   const headers = await getHeaders()
   const response = await fetch(`${FUNCTION_URL}?${params}`, { headers })
   if (!response.ok) throw new Error('Failed to fetch stats')
+  return response.json()
+}
+
+export async function fetchQuarterData(year: number, quarter: number): Promise<QuarterData> {
+  const params = new URLSearchParams({
+    action: 'quarter',
+    year: String(year),
+    quarter: String(quarter),
+  })
+  const headers = await getHeaders()
+  const response = await fetch(`${FUNCTION_URL}?${params}`, { headers })
+  if (!response.ok) throw new Error('Failed to fetch quarter data')
   return response.json()
 }

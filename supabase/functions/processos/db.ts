@@ -91,7 +91,7 @@ export async function getStats(conn: Connection) {
   )
 
   const docCases = DOC_COLUMNS.map(
-    (col) => `CASE WHEN ${col} IS NOT NULL AND ${col} != '' THEN 1 ELSE 0 END`,
+    (col) => `CASE WHEN ${col} IS NOT NULL AND ${col} != '' AND ${col} != '0' THEN 1 ELSE 0 END`,
   ).join(' + ')
 
   const [avgRows] = await conn.execute(

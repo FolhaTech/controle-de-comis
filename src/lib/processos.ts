@@ -57,5 +57,16 @@ export const DOCUMENT_FIELDS = [
 ] as const
 
 export function isDocFilled(value: string | null | undefined): boolean {
-  return value !== null && value !== undefined && value !== ''
+  if (value === null || value === undefined || value === '' || value === '0') return false
+  return true
+}
+
+export interface QuarterStats {
+  total: number
+  avgDocPercentage: number
+}
+
+export interface QuarterData {
+  processes: Process[]
+  stats: QuarterStats
 }

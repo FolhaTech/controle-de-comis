@@ -25,7 +25,9 @@ export function DocumentIndicators({ process, compact }: DocumentIndicatorsProps
           />
         )
       })}
-      <span className="ml-1 text-xs text-muted-foreground tabular-nums">{filledCount}/13</span>
+      <span className="ml-1 text-xs text-muted-foreground tabular-nums">
+        {filledCount}/{DOCUMENT_FIELDS.length}
+      </span>
     </div>
   )
 }
