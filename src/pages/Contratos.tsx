@@ -1,5 +1,15 @@
-import { useState } from 'react'
-import { Plus, Search, Trash2, Pencil, Phone, Mail, CheckCircle2, Clock } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  Plus,
+  Search,
+  Trash2,
+  Pencil,
+  Phone,
+  Mail,
+  CheckCircle2,
+  Clock,
+  Calendar,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -35,31 +45,59 @@ import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
 import { Contract } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
+import { fetchContracts } from '@/services/contracts'
+import { format } from 'date-fns'
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-})
-
+const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const displayText = (value: string | null) => value || '—'
 const displayInstallments = (installments: number | null) =>
   installments && installments > 0 ? `${installments}x` : '—'
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '—'
+  try {
+    return format(new Date(dateStr), 'dd/MM/yyyy')
+  } catch {
+    return '—'
+  }
+}
 
 export default function Contratos() {
-  const { contracts, contractsLoading, filter, deleteContract } = useAppStore()
+  const { filter, deleteContract } = useAppStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
+
+  const loadContracts = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await fetchContracts()
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível carregar os contratos.',
+      })
+    } else {
+      setContracts(data || [])
+    }
+    setLoading(false)
+  }, [toast])
+
+  useEffect(() => {
+    loadContracts()
+  }, [loadContracts])
 
   const filteredContracts = contracts.filter((c) => {
-    if (!c.start_date) return false
-    const d = new Date(c.start_date)
-    const matchesPeriod = d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year
     const matchesSearch =
       (c.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesPeriod && matchesSearch
+    if (viewMode === 'all') return matchesSearch
+    if (!c.start_date) return false
+    const d = new Date(c.start_date)
+    return d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year && matchesSearch
   })
 
   const getStatusColor = (status: string | null) => {
@@ -81,7 +119,6 @@ export default function Contratos() {
     setEditingContract(contract)
     setIsDialogOpen(true)
   }
-
   const handleOpenNew = () => {
     setEditingContract(undefined)
     setIsDialogOpen(true)
@@ -93,6 +130,7 @@ export default function Contratos() {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.' })
     } else {
       toast({ title: 'Contrato excluído' })
+      loadContracts()
     }
   }
 
@@ -105,6 +143,7 @@ export default function Contratos() {
     'Método de Entrada',
     'Parcelas',
     'Status',
+    'Data de Início',
   ]
   const hiddenClasses = [
     '',
@@ -115,19 +154,39 @@ export default function Contratos() {
     'hidden lg:table-cell',
     'hidden sm:table-cell',
     '',
+    'hidden md:table-cell',
   ]
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-subtle border">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cliente..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por cliente..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={viewMode === 'all' ? 'default' : 'outline'}
+              onClick={() => setViewMode('all')}
+            >
+              Todos
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'period' ? 'default' : 'outline'}
+              onClick={() => setViewMode('period')}
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              {String(filter.month).padStart(2, '0')}/{filter.year}
+            </Button>
+          </div>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -141,7 +200,13 @@ export default function Contratos() {
                 {editingContract ? 'Editar Contrato' : 'Registrar Novo Contrato'}
               </DialogTitle>
             </DialogHeader>
-            <ContractForm contract={editingContract} onSuccess={() => setIsDialogOpen(false)} />
+            <ContractForm
+              contract={editingContract}
+              onSuccess={() => {
+                setIsDialogOpen(false)
+                loadContracts()
+              }}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -159,18 +224,18 @@ export default function Contratos() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contractsLoading ? (
+            {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
-                  <TableCell colSpan={9}>
+                  <TableCell colSpan={10}>
                     <Skeleton className="h-10 w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : filteredContracts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  Nenhum contrato encontrado para este período.
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  Nenhum contrato encontrado.
                 </TableCell>
               </TableRow>
             ) : (
@@ -227,11 +292,7 @@ export default function Contratos() {
                       {contract.entry_value != null && contract.entry_value > 0 && (
                         <Badge
                           variant="outline"
-                          className={`text-[10px] w-fit ${
-                            contract.is_entry_paid
-                              ? 'border-success/30 text-success bg-success/5'
-                              : 'border-warning/30 text-warning-foreground bg-warning/5'
-                          }`}
+                          className={`text-[10px] w-fit ${contract.is_entry_paid ? 'border-success/30 text-success bg-success/5' : 'border-warning/30 text-warning-foreground bg-warning/5'}`}
                         >
                           {contract.is_entry_paid ? (
                             <>
@@ -266,6 +327,9 @@ export default function Contratos() {
                         Falha Interna
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {formatDate(contract.start_date)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
