@@ -1,14 +1,19 @@
 import { supabase } from '@/lib/supabase/client'
 import { Contract } from '@/lib/types'
 
-export async function fetchContracts() {
+export async function fetchContracts(): Promise<{ data: Contract[] | null; error: any }> {
   const { data, error } = await supabase
     .from('vw_formas_pagamentos')
     .select('*')
     .order('created_at', { ascending: false, nullsFirst: false })
-  const contracts = (data as Contract[] | null) ?? null
-  const filtered = contracts?.filter((c) => c.id != null) ?? null
-  return { data: filtered, error }
+
+  if (error) {
+    return { data: null, error }
+  }
+
+  const contracts = (data as Contract[] | null) ?? []
+  const filtered = contracts.filter((c) => c.id != null)
+  return { data: filtered, error: null }
 }
 
 export async function createContract(contract: Partial<Contract>) {
