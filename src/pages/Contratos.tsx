@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Search, Trash2, Pencil, Phone, Mail } from 'lucide-react'
+import { Plus, Search, Trash2, Pencil, Phone, Mail, CheckCircle2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -11,7 +11,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -34,7 +33,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
-import { format } from 'date-fns'
 import { Contract } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 
@@ -43,13 +41,12 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 })
 
-function formatDate(date: string | null) {
-  return date ? format(new Date(date), 'dd/MM/yyyy') : '—'
-}
+const displayText = (value: string | null) => value || '—'
+const displayInstallments = (installments: number | null) =>
+  installments && installments > 0 ? `${installments}x` : '—'
 
 export default function Contratos() {
-  const { contracts, contractsLoading, filter, consultants, actionTypes, deleteContract } =
-    useAppStore()
+  const { contracts, contractsLoading, filter, deleteContract } = useAppStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -65,14 +62,6 @@ export default function Contratos() {
     return matchesPeriod && matchesSearch
   })
 
-  const getConsultantName = (id: string | null) =>
-    consultants.find((c) => c.id === id)?.name || 'Não atribuído'
-
-  const getPreProcessualAgentName = (id: string | null) =>
-    consultants.find((c) => c.id === id)?.name || '—'
-
-  const getActionTypeName = (id: string | null) => actionTypes.find((a) => a.id === id)?.name || '—'
-
   const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'Ativo':
@@ -83,8 +72,6 @@ export default function Contratos() {
         return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       case 'Revertido':
         return 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-      case 'Concluído':
-        return 'bg-green-100 text-green-700 hover:bg-green-200'
       default:
         return 'bg-gray-100 text-gray-700'
     }
@@ -108,6 +95,27 @@ export default function Contratos() {
       toast({ title: 'Contrato excluído' })
     }
   }
+
+  const tableHeaders = [
+    'Cliente',
+    'Contrato',
+    'Valor Total',
+    'Entrada',
+    'Forma de Pagamento',
+    'Método de Entrada',
+    'Parcelas',
+    'Status',
+  ]
+  const hiddenClasses = [
+    '',
+    'hidden lg:table-cell',
+    '',
+    'hidden sm:table-cell',
+    'hidden md:table-cell',
+    'hidden lg:table-cell',
+    'hidden sm:table-cell',
+    '',
+  ]
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -138,18 +146,15 @@ export default function Contratos() {
         </Dialog>
       </div>
 
-      <div className="bg-white rounded-xl shadow-subtle border overflow-hidden">
+      <div className="bg-white rounded-xl shadow-subtle border overflow-hidden overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-secondary/40">
-              <TableHead>Cliente</TableHead>
-              <TableHead>Consultor</TableHead>
-              <TableHead className="hidden lg:table-cell">Atendente</TableHead>
-              <TableHead className="hidden md:table-cell">Tipo de Ação</TableHead>
-              <TableHead className="hidden sm:table-cell">Datas</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead className="hidden md:table-cell">Progresso</TableHead>
-              <TableHead>Status</TableHead>
+              {tableHeaders.map((header, i) => (
+                <TableHead key={header} className={hiddenClasses[i]}>
+                  {header}
+                </TableHead>
+              ))}
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -206,35 +211,51 @@ export default function Contratos() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {getConsultantName(contract.consultant_id)}
-                  </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {getPreProcessualAgentName(contract.pre_processual_agent_id)}
+                    {contract.name || '—'}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {getActionTypeName(contract.service_type)}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell text-xs">
-                    <div>
-                      <span className="text-muted-foreground">Início: </span>
-                      {formatDate(contract.start_date)}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Fim: </span>
-                      {formatDate(contract.end_date_planned)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap font-medium">
                     {currencyFormatter.format(contract.contracted_value || 0)}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-2 min-w-[100px]">
-                      <Progress value={contract.progress_percentage || 0} className="h-2" />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {contract.progress_percentage || 0}%
+                  <TableCell className="hidden sm:table-cell whitespace-nowrap">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm">
+                        {contract.entry_value != null && contract.entry_value > 0
+                          ? currencyFormatter.format(contract.entry_value)
+                          : '—'}
                       </span>
+                      {contract.entry_value != null && contract.entry_value > 0 && (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] w-fit ${
+                            contract.is_entry_paid
+                              ? 'border-success/30 text-success bg-success/5'
+                              : 'border-warning/30 text-warning-foreground bg-warning/5'
+                          }`}
+                        >
+                          {contract.is_entry_paid ? (
+                            <>
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                              Pago
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="h-2.5 w-2.5 mr-0.5" />
+                              Pendente
+                            </>
+                          )}
+                        </Badge>
+                      )}
                     </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    {displayText(contract.payment_method)}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {displayText(contract.entry_payment_method)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm">
+                    {displayInstallments(contract.installments)}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(contract.status)}>
