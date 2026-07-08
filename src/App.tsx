@@ -10,6 +10,7 @@ import Equipe from './pages/Equipe'
 import Quarter from './pages/Quarter'
 import Configuracoes from './pages/Configuracoes'
 import Parametros from './pages/Parametros'
+import Processos from './pages/Processos'
 import NotFound from './pages/NotFound'
 
 const App = () => (
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/quarter" element={<Quarter />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/parametros" element={<Parametros />} />
+            <Route path="/processos" element={<Processos />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

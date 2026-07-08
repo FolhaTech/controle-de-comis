@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "mysql2/promise": "npm:mysql2@3.14.0/promise"
+  }
+}

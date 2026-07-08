@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   SlidersHorizontal,
+  Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -18,6 +19,7 @@ const navItems = [
   { icon: FileText, label: 'Contratos', path: '/contratos' },
   { icon: Users, label: 'Equipe', path: '/equipe' },
   { icon: Target, label: 'Quarter', path: '/quarter' },
+  { icon: Scale, label: 'Processos', path: '/processos' },
   { icon: SlidersHorizontal, label: 'Parâmetros', path: '/parametros' },
   { icon: Settings, label: 'Configurações', path: '/configuracoes' },
 ]
