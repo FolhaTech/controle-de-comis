@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Search, Trash2, Pencil } from 'lucide-react'
+import { Plus, Search, Trash2, Pencil, Phone, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -11,6 +11,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,15 @@ import { format } from 'date-fns'
 import { Contract } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+})
+
+function formatDate(date: string | null) {
+  return date ? format(new Date(date), 'dd/MM/yyyy') : '—'
+}
+
 export default function Contratos() {
   const { contracts, filter, consultants, actionTypes, deleteContract } = useAppStore()
   const { toast } = useToast()
@@ -46,12 +57,17 @@ export default function Contratos() {
     if (!c.start_date) return false
     const d = new Date(c.start_date)
     const matchesPeriod = d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year
-    const matchesSearch = (c.client || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch =
+      (c.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     return matchesPeriod && matchesSearch
   })
 
   const getConsultantName = (id: string | null) =>
-    consultants.find((c) => c.id === id)?.name || 'Desconhecido'
+    consultants.find((c) => c.id === id)?.name || 'Não atribuído'
+
+  const getPreProcessualAgentName = (id: string | null) =>
+    consultants.find((c) => c.id === id)?.name || '—'
 
   const getActionTypeName = (id: string | null) => actionTypes.find((a) => a.id === id)?.name || '—'
 
@@ -65,6 +81,8 @@ export default function Contratos() {
         return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       case 'Revertido':
         return 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+      case 'Concluído':
+        return 'bg-green-100 text-green-700 hover:bg-green-200'
       default:
         return 'bg-gray-100 text-gray-700'
     }
@@ -124,10 +142,11 @@ export default function Contratos() {
             <TableRow className="bg-secondary/40">
               <TableHead>Cliente</TableHead>
               <TableHead>Consultor</TableHead>
+              <TableHead className="hidden lg:table-cell">Atendente</TableHead>
               <TableHead className="hidden md:table-cell">Tipo de Ação</TableHead>
-              <TableHead>Data</TableHead>
+              <TableHead className="hidden sm:table-cell">Datas</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead className="hidden lg:table-cell">Entrada</TableHead>
+              <TableHead className="hidden md:table-cell">Progresso</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -135,7 +154,7 @@ export default function Contratos() {
           <TableBody>
             {filteredContracts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Nenhum contrato encontrado para este período.
                 </TableCell>
               </TableRow>
@@ -143,37 +162,69 @@ export default function Contratos() {
               filteredContracts.map((contract) => (
                 <TableRow key={contract.id} className="hover:bg-secondary/20 transition-colors">
                   <TableCell className="font-medium">
-                    {contract.client || '—'}
-                    <span className="text-[10px] block text-muted-foreground">
-                      {contract.client_cpf || ''}
-                    </span>
+                    <div className="flex items-start gap-1.5">
+                      <div>
+                        {contract.client || contract.name || '—'}
+                        <span className="text-[10px] block text-muted-foreground">
+                          {contract.client_cpf || ''}
+                        </span>
+                      </div>
+                      {(contract.client_phone || contract.client_email) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-secondary text-muted-foreground cursor-help hover:bg-secondary/80 transition-colors">
+                              <Phone className="h-2.5 w-2.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            <div className="text-xs space-y-1">
+                              {contract.client_phone && (
+                                <div className="flex items-center gap-1.5">
+                                  <Phone className="h-3 w-3" />
+                                  <span>{contract.client_phone}</span>
+                                </div>
+                              )}
+                              {contract.client_email && (
+                                <div className="flex items-center gap-1.5">
+                                  <Mail className="h-3 w-3" />
+                                  <span>{contract.client_email}</span>
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell>{getConsultantName(contract.consultant_id)}</TableCell>
+                  <TableCell className="text-sm">
+                    {getConsultantName(contract.consultant_id)}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {getPreProcessualAgentName(contract.pre_processual_agent_id)}
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                     {getActionTypeName(contract.service_type)}
                   </TableCell>
-                  <TableCell>
-                    {contract.start_date
-                      ? format(new Date(contract.start_date), 'dd/MM/yyyy')
-                      : '—'}
+                  <TableCell className="hidden sm:table-cell text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Início: </span>
+                      {formatDate(contract.start_date)}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Fim: </span>
+                      {formatDate(contract.end_date_planned)}
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    }).format(contract.contracted_value || 0)}
+                  <TableCell className="whitespace-nowrap">
+                    {currencyFormatter.format(contract.contracted_value || 0)}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {contract.is_entry_paid ? (
-                      <span className="text-sm text-success">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(contract.entry_value || 0)}
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center gap-2 min-w-[100px]">
+                      <Progress value={contract.progress_percentage || 0} className="h-2" />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {contract.progress_percentage || 0}%
                       </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(contract.status)}>
