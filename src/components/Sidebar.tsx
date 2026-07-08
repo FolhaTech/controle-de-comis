@@ -1,4 +1,7 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   FileText,
@@ -26,6 +29,31 @@ const navItems = [
 
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { signOut, user } = useAuth()
+  const [profileName, setProfileName] = useState('Usuário')
+  const [profileRole, setProfileRole] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setProfileName(data.full_name || 'Usuário')
+            setProfileRole(data.role || '')
+          }
+        })
+    }
+  }, [user])
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login')
+  }
 
   const NavContent = () => (
     <div className="flex h-full flex-col bg-primary text-primary-foreground">
@@ -54,10 +82,13 @@ export function Sidebar({ className }: { className?: string }) {
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center justify-between px-4 py-3 bg-white/5 rounded-lg">
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-white">Ana Silva</span>
-            <span className="text-xs text-white/60">Gestora Comercial</span>
+            <span className="text-sm font-semibold text-white">{profileName}</span>
+            <span className="text-xs text-white/60 capitalize">{profileRole}</span>
           </div>
-          <button className="text-white/80 hover:text-white transition-colors">
+          <button
+            onClick={handleSignOut}
+            className="text-white/80 hover:text-white transition-colors"
+          >
             <LogOut className="h-5 w-5" />
           </button>
         </div>

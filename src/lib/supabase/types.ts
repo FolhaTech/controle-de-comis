@@ -406,6 +406,13 @@ export type Database = {
             foreignKeyName: 'expenses_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'expenses_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -457,6 +464,13 @@ export type Database = {
             columns: ['provider_id']
             isOneToOne: false
             referencedRelation: 'service_providers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'external_contracts_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
             referencedColumns: ['id']
           },
           {
@@ -521,6 +535,13 @@ export type Database = {
             foreignKeyName: 'material_movements_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'material_movements_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -576,6 +597,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'materials_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'materials_work_id_fkey'
             columns: ['work_id']
@@ -648,6 +676,13 @@ export type Database = {
             foreignKeyName: 'revenues_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'revenues_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -697,6 +732,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'service_providers_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'service_providers_work_id_fkey'
             columns: ['work_id']
@@ -819,6 +861,13 @@ export type Database = {
             foreignKeyName: 'team_members_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'team_members_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -876,6 +925,13 @@ export type Database = {
             foreignKeyName: 'work_diaries_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'work_diaries_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -921,6 +977,13 @@ export type Database = {
             foreignKeyName: 'work_extra_materials_work_id_fkey'
             columns: ['work_id']
             isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'work_extra_materials_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
             referencedRelation: 'works'
             referencedColumns: ['id']
           },
@@ -957,6 +1020,13 @@ export type Database = {
             columns: ['service_id']
             isOneToOne: false
             referencedRelation: 'services'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'work_services_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
             referencedColumns: ['id']
           },
           {
@@ -1009,6 +1079,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'work_stages_work_id_fkey'
+            columns: ['work_id']
+            isOneToOne: false
+            referencedRelation: 'vw_formas_pagamentos'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'work_stages_work_id_fkey'
             columns: ['work_id']
@@ -1135,7 +1212,121 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_formas_pagamentos: {
+        Row: {
+          address: string | null
+          budget_planned: number | null
+          cancellation_date: string | null
+          cancellation_reason: string | null
+          client: string | null
+          client_cpf: string | null
+          client_email: string | null
+          client_phone: string | null
+          consultant_id: string | null
+          contracted_value: number | null
+          created_at: string | null
+          end_date_planned: string | null
+          entry_payment_method: string | null
+          entry_value: number | null
+          id: string | null
+          installments: number | null
+          internal_failure: boolean | null
+          is_entry_paid: boolean | null
+          manager: string | null
+          name: string | null
+          notes: string | null
+          payment_method: string | null
+          pre_processual_agent_id: string | null
+          progress_percentage: number | null
+          service_type: string | null
+          start_date: string | null
+          status: string | null
+          total_area: number | null
+        }
+        Insert: {
+          address?: string | null
+          budget_planned?: number | null
+          cancellation_date?: string | null
+          cancellation_reason?: string | null
+          client?: string | null
+          client_cpf?: string | null
+          client_email?: string | null
+          client_phone?: string | null
+          consultant_id?: string | null
+          contracted_value?: number | null
+          created_at?: string | null
+          end_date_planned?: string | null
+          entry_payment_method?: string | null
+          entry_value?: number | null
+          id?: string | null
+          installments?: number | null
+          internal_failure?: boolean | null
+          is_entry_paid?: boolean | null
+          manager?: string | null
+          name?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          pre_processual_agent_id?: string | null
+          progress_percentage?: number | null
+          service_type?: string | null
+          start_date?: string | null
+          status?: string | null
+          total_area?: number | null
+        }
+        Update: {
+          address?: string | null
+          budget_planned?: number | null
+          cancellation_date?: string | null
+          cancellation_reason?: string | null
+          client?: string | null
+          client_cpf?: string | null
+          client_email?: string | null
+          client_phone?: string | null
+          consultant_id?: string | null
+          contracted_value?: number | null
+          created_at?: string | null
+          end_date_planned?: string | null
+          entry_payment_method?: string | null
+          entry_value?: number | null
+          id?: string | null
+          installments?: number | null
+          internal_failure?: boolean | null
+          is_entry_paid?: boolean | null
+          manager?: string | null
+          name?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          pre_processual_agent_id?: string | null
+          progress_percentage?: number | null
+          service_type?: string | null
+          start_date?: string | null
+          status?: string | null
+          total_area?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'works_consultant_id_fkey'
+            columns: ['consultant_id']
+            isOneToOne: false
+            referencedRelation: 'team_members'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'works_pre_processual_agent_id_fkey'
+            columns: ['pre_processual_agent_id']
+            isOneToOne: false
+            referencedRelation: 'team_members'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'works_service_type_fkey'
+            columns: ['service_type']
+            isOneToOne: false
+            referencedRelation: 'action_types'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
