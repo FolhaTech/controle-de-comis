@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { FileText, ClipboardCheck, DollarSign, TrendingUp, Search, Calendar } from 'lucide-react'
+import {
+  FileText,
+  ClipboardCheck,
+  DollarSign,
+  TrendingUp,
+  Search,
+  Calendar,
+  RefreshCw,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
 import { supabase } from '@/lib/supabase/client'
@@ -97,6 +105,8 @@ export default function Quarter() {
   const [contractsLoading, setContractsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'quarter' | 'all'>('all')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const hasFetchedRef = useRef(false)
   const { toast } = useToast()
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
@@ -164,11 +174,16 @@ export default function Quarter() {
 
   useEffect(() => {
     loadQuarterData()
-  }, [loadQuarterData])
+  }, [loadQuarterData, refreshKey])
 
   useEffect(() => {
     loadAllContracts()
-  }, [loadAllContracts])
+  }, [loadAllContracts, refreshKey])
+
+  const handleRefresh = useCallback(() => {
+    hasFetchedRef.current = false
+    setRefreshKey((k) => k + 1)
+  }, [])
 
   const processes: Process[] = data?.processes ?? []
   const stats = data?.stats
@@ -189,13 +204,27 @@ export default function Quarter() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="bg-primary text-primary-foreground p-6 md:p-8 rounded-xl shadow-elevation relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-2xl md:text-3xl font-serif font-bold mb-2">
-            Relatório Trimestral — Q{quarter}/{year}
-          </h2>
-          <p className="text-primary-foreground/80 max-w-xl text-sm md:text-base">
-            Visão consolidada de processos jurídicos e valores financeiros por trimestre.
-          </p>
+        <div className="relative z-10 flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-serif font-bold mb-2">
+              Relatório Trimestral — Q{quarter}/{year}
+            </h2>
+            <p className="text-primary-foreground/80 max-w-xl text-sm md:text-base">
+              Visão consolidada de processos jurídicos e valores financeiros por trimestre.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleRefresh}
+            className="shrink-0"
+            disabled={contractsLoading || loading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-1 ${contractsLoading || loading ? 'animate-spin' : ''}`}
+            />
+            Atualizar
+          </Button>
         </div>
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <TrendingUp className="w-40 h-40" strokeWidth={1} />
@@ -345,8 +374,8 @@ export default function Quarter() {
           <Table>
             <TableHeader>
               <TableRow className="bg-secondary/40">
+                <TableHead className="font-semibold text-primary min-w-[160px]">Cliente</TableHead>
                 <TableHead>Nome do Contrato/Obra</TableHead>
-                <TableHead>Cliente</TableHead>
                 <TableHead>CPF</TableHead>
                 <TableHead className="text-right">Valor Contratado</TableHead>
                 <TableHead className="text-right">Valor de Entrada</TableHead>
@@ -375,11 +404,11 @@ export default function Quarter() {
               ) : (
                 displayedContracts.map((c) => (
                   <TableRow key={c.id} className="hover:bg-secondary/20 transition-colors">
+                    <TableCell className="font-bold text-base text-primary min-w-[160px]">
+                      {c.client || '—'}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[180px] truncate">
                       {c.name || '—'}
-                    </TableCell>
-                    <TableCell className="font-medium max-w-[150px] truncate">
-                      {c.client || '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {c.client_cpf || '—'}
