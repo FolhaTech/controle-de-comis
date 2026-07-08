@@ -3,7 +3,7 @@ import { Contract } from '@/lib/types'
 
 export async function fetchContracts() {
   const { data, error } = await supabase
-    .from('vw_formas_pagamentos' as any)
+    .from('vw_formas_pagamentos')
     .select('*')
     .order('created_at', { ascending: false })
   return { data: (data as Contract[] | null) ?? null, error }
