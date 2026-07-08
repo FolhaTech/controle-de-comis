@@ -1,4 +1,4 @@
-import { createConnection } from 'mysql2/promise'
+import { createConnection } from 'npm:mysql2@3.14.0/promise'
 
 type Connection = Awaited<ReturnType<typeof createConnection>>
 
