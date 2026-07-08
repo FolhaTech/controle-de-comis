@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
   Select,
@@ -18,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { FileText, ClipboardCheck, DollarSign, TrendingUp } from 'lucide-react'
+import { FileText, ClipboardCheck, DollarSign, TrendingUp, Search, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
 import { supabase } from '@/lib/supabase/client'
@@ -36,14 +38,18 @@ interface QuarterContract {
   id: string
   name: string | null
   client: string | null
+  client_cpf: string | null
   contracted_value: number | null
   entry_value: number | null
   entry_payment_method: string | null
+  payment_method: string | null
   installments: number | null
   status: string | null
   start_date: string | null
   end_date_planned: string | null
   internal_failure: boolean | null
+  manager: string | null
+  address: string | null
 }
 
 function getQuarterDateRange(year: number, quarter: number) {
@@ -62,6 +68,15 @@ function formatCurrency(val: number | null | undefined) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 }
 
+function formatDate(dateStr: string | null | undefined) {
+  if (!dateStr) return '—'
+  try {
+    return format(new Date(dateStr), 'dd/MM/yyyy')
+  } catch {
+    return '—'
+  }
+}
+
 function getStatusBadge(status: string | null) {
   if (!status) return <Badge variant="secondary">—</Badge>
   const variant =
@@ -74,14 +89,19 @@ export default function Quarter() {
   const [year, setYear] = useState(now.getFullYear())
   const [quarter, setQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3))
   const [data, setData] = useState<QuarterData | null>(null)
-  const [contracts, setContracts] = useState<QuarterContract[]>([])
+  const [allContracts, setAllContracts] = useState<QuarterContract[]>([])
+  const [quarterContracts, setQuarterContracts] = useState<QuarterContract[]>([])
   const [totalValue, setTotalValue] = useState(0)
+  const [allTotalValue, setAllTotalValue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [contractsLoading, setContractsLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'quarter' | 'all'>('all')
   const { toast } = useToast()
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
-  const loadData = useCallback(async () => {
+  const loadQuarterData = useCallback(async () => {
     setLoading(true)
     const { startDate, nextStartDate } = getQuarterDateRange(year, quarter)
 
@@ -104,32 +124,67 @@ export default function Quarter() {
 
       if (viewError) throw viewError
 
-      const validContracts = (viewData || []).filter((c) => {
-        if (c.status === 'Cancelado' && !c.internal_failure) return false
-        return true
-      })
-      setContracts(validContracts as QuarterContract[])
-      const total = validContracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0)
+      setQuarterContracts((viewData || []) as QuarterContract[])
+      const total = (viewData || []).reduce((sum, c: any) => sum + (c.contracted_value || 0), 0)
       setTotalValue(total)
     } catch {
-      setContracts([])
+      setQuarterContracts([])
       setTotalValue(0)
+    }
+
+    setLoading(false)
+  }, [year, quarter])
+
+  const loadAllContracts = useCallback(async () => {
+    setContractsLoading(true)
+    try {
+      const { data: viewData, error: viewError } = await supabase
+        .from('vw_formas_pagamentos')
+        .select(
+          'id, name, client, client_cpf, contracted_value, entry_value, entry_payment_method, payment_method, installments, status, start_date, end_date_planned, internal_failure, manager, address',
+        )
+        .order('created_at', { ascending: false })
+
+      if (viewError) throw viewError
+
+      const contracts = (viewData || []) as QuarterContract[]
+      setAllContracts(contracts)
+      setAllTotalValue(contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0))
+    } catch {
+      setAllContracts([])
+      setAllTotalValue(0)
       toast({
         title: 'Erro de Conexão',
         description: 'Não foi possível carregar os contratos. Verifique sua conexão.',
         variant: 'destructive',
       })
     }
-
-    setLoading(false)
-  }, [year, quarter])
+    setContractsLoading(false)
+  }, [toast])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadQuarterData()
+  }, [loadQuarterData])
+
+  useEffect(() => {
+    loadAllContracts()
+  }, [loadAllContracts])
 
   const processes: Process[] = data?.processes ?? []
   const stats = data?.stats
+
+  const activeContracts = viewMode === 'all' ? allContracts : quarterContracts
+
+  const displayedContracts = useMemo(() => {
+    if (!search.trim()) return activeContracts
+    const q = search.toLowerCase().trim()
+    return activeContracts.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.client || '').toLowerCase().includes(q) ||
+        (c.client_cpf || '').toLowerCase().includes(q),
+    )
+  }, [activeContracts, search])
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -180,9 +235,9 @@ export default function Quarter() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         {loading ? (
-          [1, 2, 3].map((i) => (
+          [1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="pb-2">
                 <div className="h-4 w-32 bg-muted rounded" />
@@ -220,12 +275,33 @@ export default function Quarter() {
 
             <Card className="hover:shadow-md transition-shadow bg-primary/5 border-primary/20">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-primary">Valor Total</CardTitle>
+                <CardTitle className="text-sm font-medium text-primary">
+                  Valor no Trimestre
+                </CardTitle>
                 <DollarSign className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-primary">{formatCurrency(totalValue)}</div>
-                <p className="text-xs text-primary/70 mt-1">Contratos no trimestre</p>
+                <p className="text-xs text-primary/70 mt-1">
+                  Contratos do Q{quarter}/{year}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow bg-green-50 border-green-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-green-700">
+                  Valor Total Geral
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-700">
+                  {formatCurrency(allTotalValue)}
+                </div>
+                <p className="text-xs text-green-600/70 mt-1">
+                  Todos os contratos ({allContracts.length})
+                </p>
               </CardContent>
             </Card>
           </>
@@ -233,15 +309,45 @@ export default function Quarter() {
       </div>
 
       <div className="bg-white rounded-xl shadow-subtle border p-4 space-y-4">
-        <h3 className="text-lg font-serif font-bold text-primary">
-          Contratos do Q{quarter}/{year}
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-serif font-bold text-primary">
+            {viewMode === 'all' ? 'Todos os Contratos' : `Contratos do Q${quarter}/${year}`}
+          </h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={viewMode === 'all' ? 'default' : 'outline'}
+              onClick={() => setViewMode('all')}
+            >
+              Todos
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'quarter' ? 'default' : 'outline'}
+              onClick={() => setViewMode('quarter')}
+            >
+              <Calendar className="h-4 w-4 mr-1" />Q{quarter}/{year}
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente, nome ou CPF..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow className="bg-secondary/40">
-                <TableHead>Nome</TableHead>
+                <TableHead>Nome do Contrato/Obra</TableHead>
                 <TableHead>Cliente</TableHead>
+                <TableHead>CPF</TableHead>
                 <TableHead className="text-right">Valor Contratado</TableHead>
                 <TableHead className="text-right">Valor de Entrada</TableHead>
                 <TableHead>Método de Entrada</TableHead>
@@ -252,28 +358,31 @@ export default function Quarter() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {contractsLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={9}>
+                    <TableCell colSpan={10}>
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
                 ))
-              ) : contracts.length === 0 ? (
+              ) : displayedContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Nenhum contrato encontrado
                   </TableCell>
                 </TableRow>
               ) : (
-                contracts.map((c) => (
+                displayedContracts.map((c) => (
                   <TableRow key={c.id} className="hover:bg-secondary/20 transition-colors">
                     <TableCell className="font-medium max-w-[180px] truncate">
                       {c.name || '—'}
                     </TableCell>
                     <TableCell className="font-medium max-w-[150px] truncate">
                       {c.client || '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.client_cpf || '—'}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(c.contracted_value)}
@@ -285,12 +394,10 @@ export default function Quarter() {
                     <TableCell className="text-center">{c.installments || '—'}</TableCell>
                     <TableCell>{getStatusBadge(c.status)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {c.start_date ? format(new Date(c.start_date), 'dd/MM/yyyy') : '—'}
+                      {formatDate(c.start_date)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {c.end_date_planned
-                        ? format(new Date(c.end_date_planned), 'dd/MM/yyyy')
-                        : '—'}
+                      {formatDate(c.end_date_planned)}
                     </TableCell>
                   </TableRow>
                 ))
@@ -298,6 +405,13 @@ export default function Quarter() {
             </TableBody>
           </Table>
         </div>
+
+        {!contractsLoading && displayedContracts.length > 0 && (
+          <p className="text-xs text-muted-foreground text-right">
+            Exibindo {displayedContracts.length} de{' '}
+            {(viewMode === 'all' ? allContracts : quarterContracts).length} contrato(s)
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-subtle border p-4 space-y-4">
