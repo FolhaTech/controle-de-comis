@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus,
   Search,
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   Calendar,
+  AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +46,7 @@ import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
 import { Contract } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
-import { fetchContracts } from '@/services/contracts'
+import { supabase } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -62,33 +63,26 @@ const formatDate = (dateStr: string | null | undefined) => {
 }
 
 export default function Contratos() {
-  const { filter, deleteContract } = useAppStore()
+  const { contracts, contractsLoading, contractsError, filter, deleteContract, fetchContracts } =
+    useAppStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
 
-  const loadContracts = useCallback(async () => {
-    setLoading(true)
-    const { data, error } = await fetchContracts()
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Não foi possível carregar os contratos.',
-      })
-    } else {
-      setContracts(data || [])
-    }
-    setLoading(false)
-  }, [toast])
-
   useEffect(() => {
-    loadContracts()
-  }, [loadContracts])
+    fetchContracts()
+    const channel = supabase
+      .channel('works-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'works' }, () => {
+        fetchContracts()
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchContracts])
 
   const filteredContracts = contracts.filter((c) => {
     const matchesSearch =
@@ -130,7 +124,6 @@ export default function Contratos() {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.' })
     } else {
       toast({ title: 'Contrato excluído' })
-      loadContracts()
     }
   }
 
@@ -204,12 +197,18 @@ export default function Contratos() {
               contract={editingContract}
               onSuccess={() => {
                 setIsDialogOpen(false)
-                loadContracts()
               }}
             />
           </DialogContent>
         </Dialog>
       </div>
+
+      {contractsError && (
+        <div className="flex items-center gap-2 bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20 animate-fade-in-down">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{contractsError}</span>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-subtle border overflow-hidden overflow-x-auto">
         <Table>
@@ -224,7 +223,7 @@ export default function Contratos() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {contractsLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
                   <TableCell colSpan={10}>
