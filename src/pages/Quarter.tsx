@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { FileText, ClipboardCheck, DollarSign, TrendingUp } from 'lucide-react'
 import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
@@ -30,6 +31,20 @@ const QUARTERS = [
   { value: '4', label: 'Q4 — Out/Dez' },
 ]
 
+interface QuarterContract {
+  id: string
+  name: string | null
+  client: string | null
+  contracted_value: number | null
+  entry_value: number | null
+  entry_payment_method: string | null
+  installments: number | null
+  status: string | null
+  start_date: string | null
+  end_date_planned: string | null
+  internal_failure: boolean | null
+}
+
 function getQuarterDateRange(year: number, quarter: number) {
   const startMonth = (quarter - 1) * 3 + 1
   const endMonth = startMonth + 2
@@ -42,8 +57,15 @@ function getQuarterDateRange(year: number, quarter: number) {
   return { startDate, nextStartDate }
 }
 
-function formatCurrency(val: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+function formatCurrency(val: number | null | undefined) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+}
+
+function getStatusBadge(status: string | null) {
+  if (!status) return <Badge variant="secondary">—</Badge>
+  const variant =
+    status === 'Ativo' ? 'default' : status === 'Cancelado' ? 'destructive' : 'secondary'
+  return <Badge variant={variant}>{status}</Badge>
 }
 
 export default function Quarter() {
@@ -51,6 +73,7 @@ export default function Quarter() {
   const [year, setYear] = useState(now.getFullYear())
   const [quarter, setQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3))
   const [data, setData] = useState<QuarterData | null>(null)
+  const [contracts, setContracts] = useState<QuarterContract[]>([])
   const [totalValue, setTotalValue] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -68,19 +91,24 @@ export default function Quarter() {
     }
 
     try {
-      const { data: works } = await supabase
-        .from('works')
-        .select('contracted_value, start_date, status, internal_failure')
+      const { data: viewData } = await supabase
+        .from('vw_formas_pagamentos')
+        .select(
+          'id, name, client, contracted_value, entry_value, entry_payment_method, installments, status, start_date, end_date_planned, internal_failure',
+        )
         .gte('start_date', startDate)
         .lt('start_date', nextStartDate)
+        .order('start_date', { ascending: false })
 
-      const validWorks = (works || []).filter((w) => {
-        if (w.status === 'Cancelado' && !w.internal_failure) return false
+      const validContracts = (viewData || []).filter((c) => {
+        if (c.status === 'Cancelado' && !c.internal_failure) return false
         return true
       })
-      const total = validWorks.reduce((sum, w) => sum + (w.contracted_value || 0), 0)
+      setContracts(validContracts as QuarterContract[])
+      const total = validContracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0)
       setTotalValue(total)
     } catch {
+      setContracts([])
       setTotalValue(0)
     }
 
@@ -193,6 +221,74 @@ export default function Quarter() {
             </Card>
           </>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-subtle border p-4 space-y-4">
+        <h3 className="text-lg font-serif font-bold text-primary">
+          Contratos do Q{quarter}/{year}
+        </h3>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-secondary/40">
+                <TableHead>Nome</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Valor Contratado</TableHead>
+                <TableHead className="text-right">Valor de Entrada</TableHead>
+                <TableHead>Método de Entrada</TableHead>
+                <TableHead className="text-center">Parcelas</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Data de Início</TableHead>
+                <TableHead>Previsão de Término</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={9}>
+                      <Skeleton className="h-8 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : contracts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Nenhum contrato encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                contracts.map((c) => (
+                  <TableRow key={c.id} className="hover:bg-secondary/20 transition-colors">
+                    <TableCell className="font-medium max-w-[180px] truncate">
+                      {c.name || '—'}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[150px] truncate">
+                      {c.client || '—'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(c.contracted_value)}
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(c.entry_value)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.entry_payment_method || '—'}
+                    </TableCell>
+                    <TableCell className="text-center">{c.installments || '—'}</TableCell>
+                    <TableCell>{getStatusBadge(c.status)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.start_date ? format(new Date(c.start_date), 'dd/MM/yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.end_date_planned
+                        ? format(new Date(c.end_date_planned), 'dd/MM/yyyy')
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-subtle border p-4 space-y-4">
