@@ -49,11 +49,14 @@ const defaultSettings: Settings = {
 
 interface AppStoreState {
   contracts: Contract[]
+  contractsLoading: boolean
   consultants: Consultant[]
   consultantsLoading: boolean
+  actionTypes: ActionType[]
+  actionTypesLoading: boolean
   settings: Settings
   filter: FilterContext
-  actionTypes: ActionType[]
+  initApp: () => Promise<void>
   fetchConsultants: () => Promise<{ error: unknown }>
   fetchContracts: () => Promise<void>
   fetchActionTypes: () => Promise<void>
@@ -74,9 +77,11 @@ const AppContext = createContext<AppStoreState | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>([])
+  const [contractsLoading, setContractsLoading] = useState(false)
   const [consultants, setConsultants] = useState<Consultant[]>([])
   const [consultantsLoading, setConsultantsLoading] = useState(false)
   const [actionTypes, setActionTypes] = useState<ActionType[]>([])
+  const [actionTypesLoading, setActionTypesLoading] = useState(false)
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [filter, setFilterState] = useState<FilterContext>({
     month: new Date().getMonth() + 1,
@@ -91,15 +96,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { error }
   }, [])
 
-  const fetchContracts = useCallback(async () => {
+  const fetchContractsAction = useCallback(async () => {
+    setContractsLoading(true)
     const { data, error } = await fetchContracts()
     if (!error && data) setContracts(data)
+    setContractsLoading(false)
   }, [])
 
-  const fetchActionTypes = useCallback(async () => {
+  const fetchActionTypesAction = useCallback(async () => {
+    setActionTypesLoading(true)
     const { data, error } = await fetchActionTypes()
     if (!error && data) setActionTypes(data)
+    setActionTypesLoading(false)
   }, [])
+
+  const initApp = useCallback(async () => {
+    await Promise.all([fetchContractsAction(), fetchConsultants(), fetchActionTypesAction()])
+  }, [fetchContractsAction, fetchConsultants, fetchActionTypesAction])
 
   const addContract = useCallback(async (contract: Partial<Contract>) => {
     const { data, error } = await createContract(contract)
@@ -167,14 +180,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         contracts,
+        contractsLoading,
         consultants,
         consultantsLoading,
+        actionTypes,
+        actionTypesLoading,
         settings,
         filter,
-        actionTypes,
+        initApp,
         fetchConsultants,
-        fetchContracts,
-        fetchActionTypes,
+        fetchContracts: fetchContractsAction,
+        fetchActionTypes: fetchActionTypesAction,
         addContract,
         updateContract: updateContractRow,
         deleteContract: deleteContractRow,

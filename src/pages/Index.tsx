@@ -8,19 +8,29 @@ import { RecentActivity } from './dashboard/RecentActivity'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function Index() {
-  const { contracts, filter, settings } = useAppStore()
+  const { contracts, consultants, filter, settings, contractsLoading, consultantsLoading } =
+    useAppStore()
   const [hasPendingAlert, setHasPendingAlert] = useState(false)
+
+  const loading = contractsLoading || consultantsLoading
 
   const filteredContracts = filterContractsByPeriod(contracts, filter.month, filter.year)
   const metrics = calculateMetrics(filteredContracts)
   const commission = calculateCommission(filteredContracts, settings)
 
+  const activeContracts = contracts.filter((c) => c.status !== 'Cancelado').length
+  const totalContractedValue = contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0)
+  const teamSize = consultants.filter((c) => c.status === 'active').length
+  const avgProgress =
+    contracts.length > 0
+      ? contracts.reduce((sum, c) => sum + (c.progress_percentage || 0), 0) / contracts.length
+      : 0
+
   useEffect(() => {
-    // Check for Distrato Pendente older than 48h
     const hasOldPending = contracts.some((c) => {
-      if (c.status === 'Distrato Pendente') {
+      if (c.status === 'Distrato Pendente' && c.created_at) {
         const diffHours =
-          (new Date().getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60)
+          (new Date().getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60)
         return diffHours > 48
       }
       return false
@@ -42,24 +52,26 @@ export default function Index() {
       )}
 
       <MetricCards
-        validContractsCount={metrics.validContractsCount}
-        cancelledCount={metrics.cancelledCount}
-        grossRevenue={metrics.grossRevenue}
-        netRevenue={commission.total}
+        activeContracts={activeContracts}
+        totalContractedValue={totalContractedValue}
+        teamSize={teamSize}
+        avgProgress={avgProgress}
+        loading={loading}
       />
 
       <ProgressCharts
         individualCount={metrics.validContractsCount}
         individualGoal={settings.goals.individualContracts}
-        groupCount={metrics.validContractsCount} // For MVP, assuming all contracts belong to the group view here
+        groupCount={metrics.validContractsCount}
         groupGoal={settings.goals.groupContracts}
         ticketMedio={metrics.ticketMedio}
         ticketMedioGoal={settings.goals.ticketMedio}
+        loading={loading}
       />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <RecentActivity contracts={filteredContracts} />
+          <RecentActivity contracts={filteredContracts} loading={loading} />
         </div>
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-subtle border p-6 h-full">

@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 
 interface ProgressChartsProps {
@@ -9,6 +10,7 @@ interface ProgressChartsProps {
   groupGoal: number
   ticketMedio: number
   ticketMedioGoal: number
+  loading?: boolean
 }
 
 export function ProgressCharts({
@@ -18,6 +20,7 @@ export function ProgressCharts({
   groupGoal,
   ticketMedio,
   ticketMedioGoal,
+  loading = false,
 }: ProgressChartsProps) {
   const indPct = Math.min(100, (individualCount / individualGoal) * 100)
   const grpPct = Math.min(100, (groupCount / groupGoal) * 100)
@@ -29,6 +32,25 @@ export function ProgressCharts({
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+
+  if (loading) {
+    return (
+      <div className="grid gap-6 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-4 w-28 mb-1" />
+              <Skeleton className="h-3 w-24" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16 mb-4" />
+              <Skeleton className="h-3 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="grid gap-6 md:grid-cols-3">

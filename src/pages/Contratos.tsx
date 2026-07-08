@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Dialog,
@@ -47,7 +48,8 @@ function formatDate(date: string | null) {
 }
 
 export default function Contratos() {
-  const { contracts, filter, consultants, actionTypes, deleteContract } = useAppStore()
+  const { contracts, contractsLoading, filter, consultants, actionTypes, deleteContract } =
+    useAppStore()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -152,7 +154,15 @@ export default function Contratos() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredContracts.length === 0 ? (
+            {contractsLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  <TableCell colSpan={9}>
+                    <Skeleton className="h-10 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredContracts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Nenhum contrato encontrado para este período.
