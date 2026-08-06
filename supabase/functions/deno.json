@@ -4,6 +4,7 @@
     "generate-composition": 2,
     "create-user": 1,
     "delete-user": 1,
-    "processos": 2
+    "processos": 2,
+    "formas": 1
   }
 }
