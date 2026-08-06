@@ -5,7 +5,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppProvider } from '@/stores/useAppStore'
 import { AuthProvider } from '@/hooks/use-auth'
 import Layout from './components/Layout'
-import Login from './pages/Login'
 import Index from './pages/Index'
 import Contratos from './pages/Contratos'
 import Equipe from './pages/Equipe'
@@ -23,7 +22,6 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            <Route path="/login" element={<Login />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
               <Route path="/contratos" element={<Contratos />} />

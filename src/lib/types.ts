@@ -56,6 +56,7 @@ export interface Contract {
   progress_percentage: number | null
   notes: string | null
   total_area: number | null
+  closed_by: string | null
 }
 
 export interface Settings {

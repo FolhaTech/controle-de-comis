@@ -40,6 +40,41 @@ export function calculateMetrics(contracts: Contract[]) {
   }
 }
 
+export interface PersonMonthlyTotals {
+  name: string
+  months: number[]
+  total: number
+}
+
+export function buildPersonMonthlyTotals(
+  contracts: Contract[],
+  names: string[],
+  year: number,
+): PersonMonthlyTotals[] {
+  const normalize = (value: string) => value.trim().toLowerCase()
+  const monthsByPerson = new Map<string, number[]>()
+  for (const name of names) {
+    monthsByPerson.set(normalize(name), new Array(12).fill(0))
+  }
+
+  for (const c of contracts) {
+    if (!isContractValid(c) || !c.closed_by || !c.start_date) continue
+    const months = monthsByPerson.get(normalize(c.closed_by))
+    if (!months) continue
+
+    const date = new Date(c.start_date)
+    if (date.getFullYear() !== year) continue
+    months[date.getMonth()] += c.contracted_value || 0
+  }
+
+  return names
+    .map((name) => {
+      const months = monthsByPerson.get(normalize(name)) || new Array(12).fill(0)
+      return { name, months, total: months.reduce((sum, v) => sum + v, 0) }
+    })
+    .sort((a, b) => b.total - a.total)
+}
+
 export function calculateCommission(contracts: Contract[], settings: Settings) {
   const validContracts = contracts.filter(isContractValid)
   const count = validContracts.length

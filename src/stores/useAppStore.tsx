@@ -12,12 +12,7 @@ import {
   updateContract,
   deleteContract,
 } from '@/services/contracts'
-import {
-  fetchActionTypes,
-  createActionType,
-  updateActionType,
-  deleteActionType,
-} from '@/services/action-types'
+import { fetchActionTypes, createActionType } from '@/services/action-types'
 
 const defaultSettings: Settings = {
   goals: {

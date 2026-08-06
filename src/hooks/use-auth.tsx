@@ -1,10 +1,15 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase/client'
+import { createContext, useContext, useState, ReactNode } from 'react'
+
+interface AuthUser {
+  id: string
+  email: string
+  full_name: string
+  role: string
+}
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
+  user: AuthUser | null
+  session: Record<string, string> | null
   signIn: (email: string, password: string) => Promise<{ error: unknown }>
   signOut: () => Promise<{ error: unknown }>
   loading: boolean
@@ -19,34 +24,21 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user] = useState<AuthUser>({
+    id: 'local-user',
+    email: 'usuario@local.com',
+    full_name: 'Usuário Local',
+    role: 'Administrador',
+  })
+  const [session] = useState<Record<string, string>>({ token: 'local-session' })
+  const [loading] = useState(false)
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error }
+  const signIn = async () => {
+    return { error: null }
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    return { error: null }
   }
 
   return (
