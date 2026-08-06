@@ -28,13 +28,15 @@ export default function Index() {
   const metrics = calculateMetrics(filteredContracts)
   const commission = calculateCommission(filteredContracts, settings)
 
-  const activeContracts = contracts.filter((c) => c.status !== 'Cancelado').length
-  const totalContractedValue = contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0)
+  const activeContracts = metrics.validContractsCount
+  const totalContractedValue = metrics.grossRevenue
   const teamSize = consultants.filter((c) => c.status === 'active').length
   const avgProgress =
-    contracts.length > 0
-      ? contracts.reduce((sum, c) => sum + (c.progress_percentage || 0), 0) / contracts.length
+    filteredContracts.length > 0
+      ? filteredContracts.reduce((sum, c) => sum + (c.progress_percentage || 0), 0) /
+        filteredContracts.length
       : 0
+  const individualAverage = teamSize > 0 ? metrics.validContractsCount / teamSize : 0
 
   useEffect(() => {
     if (contractsError) {
@@ -80,7 +82,7 @@ export default function Index() {
       />
 
       <ProgressCharts
-        individualCount={metrics.validContractsCount}
+        individualCount={Number(individualAverage.toFixed(1))}
         individualGoal={settings.goals.individualContracts}
         groupCount={metrics.validContractsCount}
         groupGoal={settings.goals.groupContracts}
@@ -89,7 +91,7 @@ export default function Index() {
         loading={loading}
       />
 
-      <ContractsSummaryTable contracts={contracts} loading={contractsLoading} />
+      <ContractsSummaryTable contracts={filteredContracts} loading={contractsLoading} />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-2">

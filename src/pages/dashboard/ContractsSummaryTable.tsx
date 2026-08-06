@@ -33,7 +33,7 @@ export function ContractsSummaryTable({ contracts, loading }: ContractsSummaryTa
   return (
     <div className="bg-white rounded-xl shadow-subtle border p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-serif text-lg font-semibold text-primary">Contratos Recentes</h3>
+        <h3 className="font-serif text-lg font-semibold text-primary">Contratos do Mês</h3>
         <Link to="/contratos" className="text-sm text-primary hover:underline">
           Ver todos
         </Link>

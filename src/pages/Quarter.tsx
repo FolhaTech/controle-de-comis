@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -31,8 +30,8 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
-import { supabase } from '@/lib/supabase/client'
 import { DocumentIndicators } from './processos/DocumentIndicators'
+import useAppStore from '@/stores/useAppStore'
 import type { Process, QuarterData } from '@/lib/processos'
 
 const QUARTERS = [
@@ -41,24 +40,6 @@ const QUARTERS = [
   { value: '3', label: 'Q3 — Jul/Set' },
   { value: '4', label: 'Q4 — Out/Dez' },
 ]
-
-interface QuarterContract {
-  id: string
-  name: string | null
-  client: string | null
-  client_cpf: string | null
-  contracted_value: number | null
-  entry_value: number | null
-  entry_payment_method: string | null
-  payment_method: string | null
-  installments: number | null
-  status: string | null
-  start_date: string | null
-  end_date_planned: string | null
-  internal_failure: boolean | null
-  manager: string | null
-  address: string | null
-}
 
 function getQuarterDateRange(year: number, quarter: number) {
   const startMonth = (quarter - 1) * 3 + 1
@@ -97,23 +78,16 @@ export default function Quarter() {
   const [year, setYear] = useState(now.getFullYear())
   const [quarter, setQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3))
   const [data, setData] = useState<QuarterData | null>(null)
-  const [allContracts, setAllContracts] = useState<QuarterContract[]>([])
-  const [quarterContracts, setQuarterContracts] = useState<QuarterContract[]>([])
-  const [totalValue, setTotalValue] = useState(0)
-  const [allTotalValue, setAllTotalValue] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [contractsLoading, setContractsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'quarter' | 'all'>('all')
   const [refreshKey, setRefreshKey] = useState(0)
-  const hasFetchedRef = useRef(false)
-  const { toast } = useToast()
+  const { contracts, contractsLoading } = useAppStore()
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
   const loadQuarterData = useCallback(async () => {
     setLoading(true)
-    const { startDate, nextStartDate } = getQuarterDateRange(year, quarter)
 
     try {
       const quarterData = await fetchQuarterData(year, quarter)
@@ -122,73 +96,40 @@ export default function Quarter() {
       setData(null)
     }
 
-    try {
-      const { data: viewData, error: viewError } = await supabase
-        .from('vw_formas_pagamentos')
-        .select(
-          'id, name, client, contracted_value, entry_value, entry_payment_method, installments, status, start_date, end_date_planned, internal_failure',
-        )
-        .gte('start_date', startDate)
-        .lt('start_date', nextStartDate)
-        .order('start_date', { ascending: false })
-
-      if (viewError) throw viewError
-
-      setQuarterContracts((viewData || []) as QuarterContract[])
-      const total = (viewData || []).reduce((sum, c: any) => sum + (c.contracted_value || 0), 0)
-      setTotalValue(total)
-    } catch {
-      setQuarterContracts([])
-      setTotalValue(0)
-    }
-
     setLoading(false)
   }, [year, quarter])
 
-  const loadAllContracts = useCallback(async () => {
-    setContractsLoading(true)
-    try {
-      const { data: viewData, error: viewError } = await supabase
-        .from('vw_formas_pagamentos')
-        .select(
-          'id, name, client, client_cpf, contracted_value, entry_value, entry_payment_method, payment_method, installments, status, start_date, end_date_planned, internal_failure, manager, address',
-        )
-        .order('created_at', { ascending: false })
+  const quarterContracts = useMemo(() => {
+    const { startDate, nextStartDate } = getQuarterDateRange(year, quarter)
+    return contracts.filter((contract) => {
+      if (!contract.start_date) return false
+      const date = new Date(contract.start_date)
+      return date >= new Date(startDate) && date < new Date(nextStartDate)
+    })
+  }, [contracts, year, quarter])
 
-      if (viewError) throw viewError
+  const allTotalValue = useMemo(
+    () => contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0),
+    [contracts],
+  )
 
-      const contracts = (viewData || []) as QuarterContract[]
-      setAllContracts(contracts)
-      setAllTotalValue(contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0))
-    } catch {
-      setAllContracts([])
-      setAllTotalValue(0)
-      toast({
-        title: 'Erro de Conexão',
-        description: 'Não foi possível carregar os contratos. Verifique sua conexão.',
-        variant: 'destructive',
-      })
-    }
-    setContractsLoading(false)
-  }, [toast])
+  const totalValue = useMemo(
+    () => quarterContracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0),
+    [quarterContracts],
+  )
 
   useEffect(() => {
     loadQuarterData()
   }, [loadQuarterData, refreshKey])
 
-  useEffect(() => {
-    loadAllContracts()
-  }, [loadAllContracts, refreshKey])
-
   const handleRefresh = useCallback(() => {
-    hasFetchedRef.current = false
     setRefreshKey((k) => k + 1)
   }, [])
 
   const processes: Process[] = data?.processes ?? []
   const stats = data?.stats
 
-  const activeContracts = viewMode === 'all' ? allContracts : quarterContracts
+  const activeContracts = viewMode === 'all' ? contracts : quarterContracts
 
   const displayedContracts = useMemo(() => {
     if (!search.trim()) return activeContracts
@@ -329,7 +270,7 @@ export default function Quarter() {
                   {formatCurrency(allTotalValue)}
                 </div>
                 <p className="text-xs text-green-600/70 mt-1">
-                  Todos os contratos ({allContracts.length})
+                  Todos os contratos ({contracts.length})
                 </p>
               </CardContent>
             </Card>
@@ -438,7 +379,7 @@ export default function Quarter() {
         {!contractsLoading && displayedContracts.length > 0 && (
           <p className="text-xs text-muted-foreground text-right">
             Exibindo {displayedContracts.length} de{' '}
-            {(viewMode === 'all' ? allContracts : quarterContracts).length} contrato(s)
+            {(viewMode === 'all' ? contracts : quarterContracts).length} contrato(s)
           </p>
         )}
       </div>

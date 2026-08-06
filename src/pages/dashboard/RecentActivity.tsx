@@ -11,7 +11,7 @@ interface RecentActivityProps {
 
 export function RecentActivity({ contracts, loading = false }: RecentActivityProps) {
   const recent = [...contracts]
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .sort((a, b) => new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime())
     .slice(0, 5)
 
   const getStatusColor = (status: string | null) => {

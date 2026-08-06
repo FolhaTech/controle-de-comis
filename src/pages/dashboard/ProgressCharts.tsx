@@ -58,7 +58,7 @@ export function ProgressCharts({
         <CardHeader>
           <CardTitle className="text-md">Meta Individual</CardTitle>
           <CardDescription>
-            {individualCount} de {individualGoal} contratos
+            Média de {individualCount} de {individualGoal} contratos por pessoa
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -73,7 +73,7 @@ export function ProgressCharts({
         <CardHeader>
           <CardTitle className="text-md">Meta Equipe</CardTitle>
           <CardDescription>
-            {groupCount} de {groupGoal} contratos
+            {groupCount} de {groupGoal} contratos no mês
           </CardDescription>
         </CardHeader>
         <CardContent>

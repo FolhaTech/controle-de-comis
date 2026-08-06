@@ -48,7 +48,7 @@ export function MetricCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{activeContracts}</div>
-          <p className="text-xs text-muted-foreground mt-1">Status não cancelado</p>
+          <p className="text-xs text-muted-foreground mt-1">No mês selecionado</p>
         </CardContent>
       </Card>
       <Card className="hover:shadow-md transition-shadow">
@@ -58,7 +58,7 @@ export function MetricCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatCurrency(totalContractedValue)}</div>
-          <p className="text-xs text-muted-foreground mt-1">Soma total da tabela</p>
+          <p className="text-xs text-muted-foreground mt-1">Fechado no mês selecionado</p>
         </CardContent>
       </Card>
       <Card className="hover:shadow-md transition-shadow">

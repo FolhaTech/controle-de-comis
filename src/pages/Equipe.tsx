@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
 import { ConsultantForm } from './equipe/ConsultantForm'
+import { MonthlyValuesTable } from './equipe/MonthlyValuesTable'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 
@@ -75,11 +76,13 @@ function formatType(type: string | null): string {
 }
 
 export default function Equipe() {
-  const { consultants, consultantsLoading, fetchConsultants, deleteConsultant } = useAppStore()
+  const { consultants, consultantsLoading, fetchConsultants, deleteConsultant, contracts, contractsLoading } =
+    useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
   const { toast } = useToast()
 
   useEffect(() => {
@@ -310,6 +313,14 @@ export default function Equipe() {
           </CardContent>
         </Card>
       )}
+
+      <MonthlyValuesTable
+        consultants={consultants}
+        contracts={contracts}
+        year={valuesYear}
+        onYearChange={setValuesYear}
+        loading={consultantsLoading || contractsLoading}
+      />
 
       <AlertDialog
         open={!!deleteTarget}
