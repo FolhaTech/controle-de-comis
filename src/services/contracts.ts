@@ -154,7 +154,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
             status: r.status ?? 'Ativo',
-            start_date: r.Data_Abertura ? new Date(r.Data_Abertura).toISOString() : null,
+            start_date: r.Data_Execucao ? new Date(r.Data_Execucao).toISOString() : null,
             end_date_planned: r.end_date_planned ?? null,
             internal_failure: r.internal_failure ?? null,
             manager: r.manager ?? null,

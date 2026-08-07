@@ -21,6 +21,10 @@ async function getConnection() {
     password: MYSQL_PASSWORD,
     database: MYSQL_DATABASE,
     port: 3306,
+    // DATETIME columns are recorded in Brazil local time; pin this explicitly so
+    // date math is identical regardless of the server process's own timezone
+    // (e.g. Vercel's serverless functions run in UTC, not America/Sao_Paulo).
+    timezone: '-03:00',
   })
 }
 
@@ -75,10 +79,10 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
     let query = 'SELECT * FROM vw_formas_pagamentos'
     const params = []
     if (startDate && nextStartDate) {
-      query += ' WHERE Data_Abertura >= ? AND Data_Abertura < ?'
+      query += ' WHERE Data_Execucao >= ? AND Data_Execucao < ?'
       params.push(startDate, nextStartDate)
     }
-    query += ' ORDER BY Data_Abertura DESC'
+    query += ' ORDER BY Data_Execucao DESC'
     if (limit !== null && Number.isFinite(limit) && limit > 0) {
       query += ' LIMIT ?'
       params.push(limit)
