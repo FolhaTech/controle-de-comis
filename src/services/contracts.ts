@@ -151,6 +151,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             contracted_value: parseNumericValue(r.valor_pagto ?? r.valor),
             entry_value: parseNumericValue(r.Entrada),
             entry_payment_method: normalizePaymentMethod(r.entry_payment_method),
+            is_entry_paid: Boolean(r.data_entrada_pgto),
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
             status: r.status ?? 'Ativo',

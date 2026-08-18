@@ -70,6 +70,8 @@ export default function Contratos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
   const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
+  const [contratoSearchOpen, setContratoSearchOpen] = useState(false)
+  const [contratoSearchTerm, setContratoSearchTerm] = useState('')
 
   useEffect(() => {
     fetchContracts()
@@ -79,10 +81,18 @@ export default function Contratos() {
     const matchesSearch =
       (c?.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    if (viewMode === 'all') return matchesSearch
+    const matchesContrato = (c?.name || '')
+      .toLowerCase()
+      .includes(contratoSearchTerm.toLowerCase())
+    if (viewMode === 'all') return matchesSearch && matchesContrato
     if (!c?.start_date) return false
     const d = new Date(c.start_date)
-    return d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year && matchesSearch
+    return (
+      d.getMonth() + 1 === filter.month &&
+      d.getFullYear() === filter.year &&
+      matchesSearch &&
+      matchesContrato
+    )
   })
 
   const periodTotalValue = filteredContracts.reduce(
@@ -300,7 +310,30 @@ export default function Contratos() {
             <TableRow className="bg-secondary/40">
               {tableHeaders.map((header, i) => (
                 <TableHead key={header} className={hiddenClasses[i]}>
-                  {header}
+                  {header === 'Contrato' ? (
+                    <div className="flex items-center gap-1">
+                      <span>{header}</span>
+                      <button
+                        type="button"
+                        onClick={() => setContratoSearchOpen((open) => !open)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Buscar por contrato"
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                      </button>
+                      {contratoSearchOpen && (
+                        <Input
+                          autoFocus
+                          value={contratoSearchTerm}
+                          onChange={(e) => setContratoSearchTerm(e.target.value)}
+                          placeholder="Localizar..."
+                          className="h-7 w-32 text-xs font-normal"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    header
+                  )}
                 </TableHead>
               ))}
               <TableHead className="text-right">Ações</TableHead>
