@@ -94,12 +94,9 @@ export async function fetchTeamMembers() {
 export async function createTeamMember(member: Partial<Consultant>) {
   const items = loadTeamMembers()
   const newMember: Consultant = {
+    ...makeConsultant(member.name || 'Novo Consultor'),
+    ...member,
     id: crypto.randomUUID(),
-    name: member.name || 'Novo Consultor',
-    role: member.role || 'Consultor',
-    phone: member.phone || null,
-    email: member.email || null,
-    work_name: member.work_name || null,
     created_at: new Date().toISOString(),
   }
   saveTeamMembers([newMember, ...items])

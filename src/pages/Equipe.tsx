@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, AlertCircle, FileDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,7 @@ import {
 } from './equipe/ConsultantContractsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
+import { generatePremiacaoPdf } from './equipe/premiacaoPdf'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -116,6 +117,7 @@ export default function Equipe() {
   const [viewingContractsFor, setViewingContractsFor] = useState<Consultant | null>(null)
   const [viewingPeriod, setViewingPeriod] = useState<ContractsPeriod>('all')
   const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
+  const [isExportingPdfs, setIsExportingPdfs] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -162,6 +164,29 @@ export default function Equipe() {
     setDeleteTarget(null)
   }
 
+  const handleExportPdfs = async () => {
+    if (consultants.length === 0) return
+    setIsExportingPdfs(true)
+    try {
+      for (const consultant of consultants) {
+        await generatePremiacaoPdf(consultant, contracts, settings, filter.month, filter.year)
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      }
+      toast({
+        title: 'PDFs gerados',
+        description: `${consultants.length} PDF(s) baixados para ${MONTHS[filter.month - 1]}/${filter.year}.`,
+      })
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar PDFs',
+        description: 'Não foi possível gerar um ou mais PDFs.',
+      })
+    } finally {
+      setIsExportingPdfs(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -169,24 +194,37 @@ export default function Equipe() {
           <h2 className="text-2xl font-serif font-bold">Equipe Comercial</h2>
           <p className="text-muted-foreground">Gerencie os consultores e seus acessos.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleOpenNew} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" /> Novo Membro
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
-              </DialogTitle>
-            </DialogHeader>
-            <ConsultantForm
-              consultant={editingConsultant}
-              onSuccess={() => setIsDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={handleExportPdfs}
+            disabled={isExportingPdfs || consultantsLoading || consultants.length === 0}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            {isExportingPdfs
+              ? 'Gerando PDFs...'
+              : `Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleOpenNew} className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" /> Novo Membro
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
+                </DialogTitle>
+              </DialogHeader>
+              <ConsultantForm
+                consultant={editingConsultant}
+                onSuccess={() => setIsDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-subtle border overflow-hidden">
