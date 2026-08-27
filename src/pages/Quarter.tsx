@@ -32,6 +32,7 @@ import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
 import { DocumentIndicators } from './processos/DocumentIndicators'
 import useAppStore from '@/stores/useAppStore'
+import { contractValue } from '@/lib/calculations'
 import type { Process, QuarterData } from '@/lib/processos'
 
 const QUARTERS = [
@@ -109,12 +110,12 @@ export default function Quarter() {
   }, [contracts, year, quarter])
 
   const allTotalValue = useMemo(
-    () => contracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0),
+    () => contracts.reduce((sum, c) => sum + contractValue(c), 0),
     [contracts],
   )
 
   const totalValue = useMemo(
-    () => quarterContracts.reduce((sum, c) => sum + (c.contracted_value || 0), 0),
+    () => quarterContracts.reduce((sum, c) => sum + contractValue(c), 0),
     [quarterContracts],
   )
 
@@ -355,7 +356,7 @@ export default function Quarter() {
                       {c.client_cpf || '—'}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {formatCurrency(c.contracted_value)}
+                      {formatCurrency(contractValue(c))}
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(c.entry_value)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">

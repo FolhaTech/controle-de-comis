@@ -149,13 +149,18 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             client_phone: r.client_phone ?? null,
             client_email: r.client_email ?? null,
             contracted_value: parseNumericValue(r.valor_pagto ?? r.valor),
+            commission_base_value: parseNumericValue(r.valor_desconto_forma_pagamento),
             entry_value: parseNumericValue(r.Entrada),
             entry_payment_method: normalizePaymentMethod(r.entry_payment_method),
             is_entry_paid: Boolean(r.data_entrada_pgto),
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
             status: r.status ?? 'Ativo',
-            start_date: r.Data_Execucao ? new Date(r.Data_Execucao).toISOString() : null,
+            start_date: r.data_entrada_pgto
+              ? new Date(r.data_entrada_pgto).toISOString()
+              : r.Data_Execucao
+                ? new Date(r.Data_Execucao).toISOString()
+                : null,
             end_date_planned: r.end_date_planned ?? null,
             internal_failure: r.internal_failure ?? null,
             manager: r.manager ?? null,

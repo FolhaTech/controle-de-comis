@@ -46,6 +46,7 @@ import {
 import useAppStore from '@/stores/useAppStore'
 import { ContractForm } from './contratos/ContractForm'
 import { Contract } from '@/lib/types'
+import { contractValue as valueOf } from '@/lib/calculations'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
@@ -96,7 +97,7 @@ export default function Contratos() {
   })
 
   const periodTotalValue = filteredContracts.reduce(
-    (sum, c) => sum + (c.contracted_value || 0),
+    (sum, c) => sum + valueOf(c),
     0,
   )
 
@@ -161,7 +162,7 @@ export default function Contratos() {
       contract.client_phone || '',
       contract.client_email || '',
       contract.name || '',
-      currencyFormatter.format(contract.contracted_value || 0),
+      currencyFormatter.format(valueOf(contract)),
       contract.entry_value != null && contract.entry_value > 0
         ? currencyFormatter.format(contract.entry_value)
         : '',
@@ -399,7 +400,7 @@ export default function Contratos() {
                     {contract.name || '—'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap font-medium">
-                    {currencyFormatter.format(contract.contracted_value || 0)}
+                    {currencyFormatter.format(valueOf(contract))}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell whitespace-nowrap">
                     <div className="flex flex-col gap-0.5">

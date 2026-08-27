@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Contract } from '@/lib/types'
+import { contractValue } from '@/lib/calculations'
 import { format } from 'date-fns'
 
 interface RecentActivityProps {
@@ -70,7 +71,7 @@ export function RecentActivity({ contracts, loading = false }: RecentActivityPro
               </div>
               <div className="flex items-center space-x-4">
                 <span className="font-semibold text-sm">
-                  {formatCurrency(contract.contracted_value || 0)}
+                  {formatCurrency(contractValue(contract))}
                 </span>
                 <Badge variant="secondary" className={getStatusColor(contract.status)}>
                   {contract.status || '—'}

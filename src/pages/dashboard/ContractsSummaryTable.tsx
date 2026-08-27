@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Contract } from '@/lib/types'
+import { contractValue } from '@/lib/calculations'
 
 function formatCurrency(val: number | null | undefined) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
@@ -76,7 +77,7 @@ export function ContractsSummaryTable({ contracts, loading }: ContractsSummaryTa
                     {c.client || '—'}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {formatCurrency(c.contracted_value)}
+                    {formatCurrency(contractValue(c))}
                   </TableCell>
                   <TableCell className="text-right">{formatCurrency(c.entry_value)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
