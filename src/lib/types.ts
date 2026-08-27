@@ -39,6 +39,7 @@ export interface Contract {
   service_type: string | null
   start_date: string | null
   contracted_value: number | null
+  commission_base_value: number | null
   payment_method: string | null
   installments: number | null
   status: string | null
@@ -74,9 +75,8 @@ export interface Settings {
   }[]
   bonuses: {
     highValueThreshold: number
-    highValuePercentage: number
-    maxInstallments: number
-    installmentsPercentage: number
+    creditCardBonusPercentage: number
+    cashBonusPercentage: number
   }
   quarterTiers: {
     contracts: number
@@ -86,6 +86,14 @@ export interface Settings {
     year: number
     value: number
     appliedPercentage: number
+  }
+  attendantCommission: {
+    baseAllowance: number
+    tiers: {
+      min: number
+      max: number | null
+      valuePerContract: number
+    }[]
   }
 }
 

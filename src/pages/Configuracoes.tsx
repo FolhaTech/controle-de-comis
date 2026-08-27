@@ -143,6 +143,100 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Bônus de Comissão</CardTitle>
+              <CardDescription>
+                Aplicado por contrato, apenas quando o valor for maior que o limite abaixo — os
+                dois bônus não se somam, valem de acordo com a forma de pagamento.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 p-3 border rounded-md bg-secondary/20">
+                  <div className="flex-1">
+                    <span className="font-medium">
+                      Limite de valor (base do bônus)
+                    </span>
+                  </div>
+                  <div className="font-bold text-primary">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(settings.bonuses.highValueThreshold)}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 p-3 border rounded-md">
+                  <div className="flex-1">
+                    <span className="font-medium">
+                      Pagamento no Cartão, valor acima do limite
+                    </span>
+                  </div>
+                  <div className="font-bold text-primary">
+                    +{settings.bonuses.creditCardBonusPercentage}%
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 p-3 border rounded-md">
+                  <div className="flex-1">
+                    <span className="font-medium">
+                      Pagamento À Vista, valor acima do limite
+                    </span>
+                  </div>
+                  <div className="font-bold text-primary">
+                    +{settings.bonuses.cashBonusPercentage}%
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  * Para editar os bônus, entre em contato com o suporte técnico.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Comissão de Atendimento (Setor Trabalhista)</CardTitle>
+              <CardDescription>
+                Ajuda de custo fixa + valor por contrato fechado no mês, por atendente.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 p-3 border rounded-md bg-secondary/20">
+                  <div className="flex-1">
+                    <span className="font-medium">Ajuda de Custo (fixa)</span>
+                  </div>
+                  <div className="font-bold text-primary">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(settings.attendantCommission.baseAllowance)}
+                  </div>
+                </div>
+                {settings.attendantCommission.tiers.map((tier, idx) => (
+                  <div key={idx} className="flex items-center space-x-4 p-3 border rounded-md">
+                    <div className="flex-1">
+                      <span className="font-medium">
+                        {tier.min} a {tier.max === null ? '++' : tier.max} contratos
+                      </span>
+                    </div>
+                    <div className="font-bold text-primary">
+                      {tier.valuePerContract === 0
+                        ? 'Sem comissão'
+                        : `${new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(tier.valuePerContract)} / contrato`}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground mt-4">
+                  * Para editar essa regra, entre em contato com o suporte técnico.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="ajuda" className="mt-6">

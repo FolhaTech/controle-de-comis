@@ -30,9 +30,8 @@ const defaultSettings: Settings = {
   ],
   bonuses: {
     highValueThreshold: 3000,
-    highValuePercentage: 1.0,
-    maxInstallments: 12,
-    installmentsPercentage: 2.0,
+    creditCardBonusPercentage: 1.0,
+    cashBonusPercentage: 2.0,
   },
   quarterTiers: [
     { contracts: 105, award: 1250 },
@@ -40,6 +39,15 @@ const defaultSettings: Settings = {
     { contracts: 150, award: 2500 },
   ],
   ipca: { year: 2025, value: 4.83, appliedPercentage: 70 },
+  attendantCommission: {
+    baseAllowance: 2000,
+    tiers: [
+      { min: 0, max: 9, valuePerContract: 0 },
+      { min: 10, max: 35, valuePerContract: 25 },
+      { min: 36, max: 49, valuePerContract: 50 },
+      { min: 50, max: null, valuePerContract: 60 },
+    ],
+  },
 }
 
 interface AppStoreState {
