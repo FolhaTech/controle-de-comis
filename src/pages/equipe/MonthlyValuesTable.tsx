@@ -9,7 +9,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buildPersonMonthlyTotals } from '@/lib/calculations'
-import type { Contract, Consultant } from '@/lib/types'
+import type { Contract, Consultant, Settings } from '@/lib/types'
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
@@ -19,6 +19,7 @@ const fullCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currenc
 interface MonthlyValuesTableProps {
   consultants: Consultant[]
   contracts: Contract[]
+  settings: Settings
   year: number
   onYearChange: (year: number) => void
   loading?: boolean
@@ -27,12 +28,13 @@ interface MonthlyValuesTableProps {
 export function MonthlyValuesTable({
   consultants,
   contracts,
+  settings,
   year,
   onYearChange,
   loading = false,
 }: MonthlyValuesTableProps) {
   const names = consultants.map((c) => c.name).filter(Boolean)
-  const rows = buildPersonMonthlyTotals(contracts, names, year)
+  const rows = buildPersonMonthlyTotals(contracts, names, year, settings)
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i)
 
   const yearTotal = rows.reduce((sum, r) => sum + r.total, 0)
@@ -45,7 +47,9 @@ export function MonthlyValuesTable({
           <h3 className="font-serif text-lg font-semibold text-primary">
             Valores Fechados por Pessoa
           </h3>
-          <p className="text-xs text-muted-foreground">Valores em R$, por mês de {year}</p>
+          <p className="text-xs text-muted-foreground">
+            Comissão a receber (R$), por mês de {year}
+          </p>
         </div>
         <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
           <SelectTrigger className="w-28">

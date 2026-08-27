@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,8 +31,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
+import { calculatePersonMonthlyCommission } from '@/lib/calculations'
 import { ConsultantForm } from './equipe/ConsultantForm'
 import { MonthlyValuesTable } from './equipe/MonthlyValuesTable'
+import { CommissionMonthlyTable } from './equipe/CommissionMonthlyTable'
+import { AttendantCommissionTable } from './equipe/AttendantCommissionTable'
+import {
+  ConsultantContractsDialog,
+  type ContractsPeriod,
+} from './equipe/ConsultantContractsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 
@@ -41,6 +49,21 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 })
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
+
+const MONTHS = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
 
 function formatPaymentType(type: string | null): string {
   switch (type) {
@@ -76,12 +99,22 @@ function formatType(type: string | null): string {
 }
 
 export default function Equipe() {
-  const { consultants, consultantsLoading, fetchConsultants, deleteConsultant, contracts, contractsLoading } =
-    useAppStore()
+  const {
+    consultants,
+    consultantsLoading,
+    fetchConsultants,
+    deleteConsultant,
+    contracts,
+    contractsLoading,
+    settings,
+    filter,
+  } = useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [viewingContractsFor, setViewingContractsFor] = useState<Consultant | null>(null)
+  const [viewingPeriod, setViewingPeriod] = useState<ContractsPeriod>('all')
   const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
   const { toast } = useToast()
 
@@ -170,6 +203,7 @@ export default function Equipe() {
               <TableHead className="hidden xl:table-cell">PIX</TableHead>
               <TableHead className="hidden lg:table-cell">Admissão</TableHead>
               <TableHead className="hidden xl:table-cell">Projeto</TableHead>
+              <TableHead>Contratos</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -207,6 +241,9 @@ export default function Equipe() {
                   <TableCell className="hidden xl:table-cell">
                     <Skeleton className="h-5 w-24" />
                   </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-8 w-32" />
+                  </TableCell>
                   <TableCell className="text-right">
                     <Skeleton className="h-8 w-16 ml-auto" />
                   </TableCell>
@@ -214,7 +251,7 @@ export default function Equipe() {
               ))
             ) : consultants.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12">
+                <TableCell colSpan={12} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Users className="h-10 w-10 opacity-40" />
                     <p className="font-medium">Nenhum membro da equipe encontrado</p>
@@ -253,9 +290,15 @@ export default function Equipe() {
                       {formatPaymentType(consultant.payment_type)}
                     </TableCell>
                     <TableCell className="text-sm font-medium">
-                      {consultant.payment_type === 'monthly' || consultant.fixed_salary
-                        ? currencyFormatter.format(consultant.fixed_salary || 0)
-                        : currencyFormatter.format(consultant.daily_cost || 0)}
+                      {currencyFormatter.format(
+                        calculatePersonMonthlyCommission(
+                          contracts,
+                          consultant.name,
+                          filter.month,
+                          filter.year,
+                          settings,
+                        ).total,
+                      )}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.phone || '—'}
@@ -270,6 +313,27 @@ export default function Equipe() {
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.work_name || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        onValueChange={(value) => {
+                          setViewingContractsFor(consultant)
+                          setViewingPeriod(value as ContractsPeriod)
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[150px] text-xs">
+                          <SelectValue placeholder="Ver contratos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os períodos</SelectItem>
+                          {MONTHS.map((m, i) => (
+                            <SelectItem key={i} value={`${i + 1}-${filter.year}`}>
+                              {m}/{filter.year}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">Período personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -314,11 +378,30 @@ export default function Equipe() {
         </Card>
       )}
 
+      <AttendantCommissionTable
+        consultants={consultants}
+        contracts={contracts}
+        settings={settings}
+        month={filter.month}
+        year={filter.year}
+        loading={consultantsLoading || contractsLoading}
+      />
+
       <MonthlyValuesTable
         consultants={consultants}
         contracts={contracts}
+        settings={settings}
         year={valuesYear}
         onYearChange={setValuesYear}
+        loading={consultantsLoading || contractsLoading}
+      />
+
+      <CommissionMonthlyTable
+        consultants={consultants}
+        contracts={contracts}
+        settings={settings}
+        month={filter.month}
+        year={filter.year}
         loading={consultantsLoading || contractsLoading}
       />
 
@@ -351,6 +434,18 @@ export default function Equipe() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConsultantContractsDialog
+        consultant={viewingContractsFor}
+        contracts={contracts}
+        settings={settings}
+        open={!!viewingContractsFor}
+        onOpenChange={(open) => {
+          if (!open) setViewingContractsFor(null)
+        }}
+        initialPeriod={viewingPeriod}
+        year={filter.year}
+      />
     </div>
   )
 }

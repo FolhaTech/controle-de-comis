@@ -2,6 +2,9 @@ import { Consultant } from '@/lib/types'
 
 const TEAM_MEMBERS_STORAGE_KEY = 'controle-de-comis-team-members'
 
+// System/bot accounts and manually-added entries that should not appear as team members.
+const EXCLUDED_NAMES = new Set(['robo cadastro cliente', 'tiago izaias'])
+
 function loadTeamMembers(): Consultant[] {
   const stored = localStorage.getItem(TEAM_MEMBERS_STORAGE_KEY)
   if (!stored) return []
@@ -62,15 +65,17 @@ async function fetchInserridoPgtoNames(): Promise<string[]> {
 }
 
 export async function fetchTeamMembers() {
-  const existing = loadTeamMembers()
-  const namesFromContracts = await fetchInserridoPgtoNames()
+  const existing = loadTeamMembers().filter((c) => !EXCLUDED_NAMES.has(c.name.trim().toLowerCase()))
+  const namesFromContracts = (await fetchInserridoPgtoNames()).filter(
+    (name) => !EXCLUDED_NAMES.has(name.trim().toLowerCase()),
+  )
 
   if (namesFromContracts.length === 0) {
     return { data: existing, error: null }
   }
 
   const existingByName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c]))
-  let changed = false
+  let changed = loadTeamMembers().length !== existing.length
 
   for (const name of namesFromContracts) {
     const key = name.trim().toLowerCase()
