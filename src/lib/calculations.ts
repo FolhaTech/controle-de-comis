@@ -1,10 +1,10 @@
 import { Contract, Settings } from './types'
 
 // Value to use everywhere "the contract's value" is shown or summed:
-// valor_pagto (gross contracted value), falling back to the payment-method
-// discounted commission base only when the gross value isn't available.
+// valor_desconto_forma_pagamento (net, after payment-method discount),
+// falling back to the gross contracted value when it isn't available.
 export function contractValue(contract: Contract): number {
-  return contract.contracted_value ?? contract.commission_base_value ?? 0
+  return contract.commission_base_value ?? contract.contracted_value ?? 0
 }
 
 export function isContractValid(contract: Contract) {
