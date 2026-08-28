@@ -133,14 +133,28 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
         if (!res.ok) throw new Error(`API error ${res.status}`)
         const body = await res.json()
         const rows: Record<string, any>[] = body?.data ?? []
-        const contracts: Contract[] = []
-        const seenProcessIds = new Set<string>()
 
+        // The view can list the same processo_id more than once (one row per
+        // workflow step touch). When that happens, prefer whichever copy has
+        // an actual valor_pagto over a duplicate where it's 0/empty.
+        const bestRowByProcessId = new Map<string, Record<string, any>>()
         for (const r of rows) {
           const processId = String(r.processo_id ?? r.id ?? '')
-          if (!processId || seenProcessIds.has(processId)) continue
-          seenProcessIds.add(processId)
+          if (!processId) continue
+          const existing = bestRowByProcessId.get(processId)
+          if (!existing) {
+            bestRowByProcessId.set(processId, r)
+            continue
+          }
+          const existingHasValue = (parseNumericValue(existing.valor_pagto ?? existing.valor) ?? 0) > 0
+          const candidateHasValue = (parseNumericValue(r.valor_pagto ?? r.valor) ?? 0) > 0
+          if (!existingHasValue && candidateHasValue) {
+            bestRowByProcessId.set(processId, r)
+          }
+        }
 
+        const contracts: Contract[] = []
+        for (const [processId, r] of bestRowByProcessId) {
           contracts.push({
             id: processId,
             name: r.name ?? r.nom_tarefa ?? null,
