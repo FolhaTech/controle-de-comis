@@ -79,10 +79,10 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
     let query = 'SELECT * FROM vw_formas_pagamentos'
     const params = []
     if (startDate && nextStartDate) {
-      query += ' WHERE COALESCE(data_entrada_pgto, Data_Execucao) >= ? AND COALESCE(data_entrada_pgto, Data_Execucao) < ?'
+      query += ' WHERE COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) >= ? AND COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) < ?'
       params.push(startDate, nextStartDate)
     }
-    query += ' ORDER BY COALESCE(data_entrada_pgto, Data_Execucao) DESC'
+    query += ' ORDER BY COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) DESC'
     if (limit !== null && Number.isFinite(limit) && limit > 0) {
       query += ' LIMIT ?'
       params.push(limit)
