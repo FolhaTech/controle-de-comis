@@ -49,6 +49,22 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 })
 
+// Fallback Ajuda de Custo when a consultant hasn't had fixed_salary filled in
+// via the edit form yet (that field is saved per-browser, so this keeps the
+// known values visible everywhere until someone fills the form for real).
+const DEFAULT_AJUDA_CUSTO: Record<string, number> = {
+  'amanda iagarashi': 1401.19,
+  'camila salles': 1401.19,
+  'kamila marson': 1463.75,
+  'ivani silva': 2479.03,
+  'denise germano': 2000.0,
+}
+
+function getAjudaCusto(consultant: Consultant): number {
+  if (consultant.fixed_salary) return consultant.fixed_salary
+  return DEFAULT_AJUDA_CUSTO[consultant.name.trim().toLowerCase()] ?? 0
+}
+
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
 
 const MONTHS = [
@@ -237,6 +253,7 @@ export default function Equipe() {
               <TableHead className="hidden lg:table-cell">Tipo</TableHead>
               <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
               <TableHead>Remuneração</TableHead>
+              <TableHead>Remuneração + Ajuda de Custo</TableHead>
               <TableHead className="hidden xl:table-cell">Telefone</TableHead>
               <TableHead className="hidden xl:table-cell">PIX</TableHead>
               <TableHead className="hidden lg:table-cell">Admissão</TableHead>
@@ -267,6 +284,9 @@ export default function Equipe() {
                   <TableCell>
                     <Skeleton className="h-5 w-24" />
                   </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
                   <TableCell className="hidden xl:table-cell">
                     <Skeleton className="h-5 w-28" />
                   </TableCell>
@@ -289,7 +309,7 @@ export default function Equipe() {
               ))
             ) : consultants.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-12">
+                <TableCell colSpan={13} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Users className="h-10 w-10 opacity-40" />
                     <p className="font-medium">Nenhum membro da equipe encontrado</p>
@@ -302,6 +322,13 @@ export default function Equipe() {
             ) : (
               consultants.map((consultant) => {
                 const statusInfo = formatStatus(consultant.status)
+                const remuneracao = calculatePersonMonthlyCommission(
+                  contracts,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                  settings,
+                ).total
                 return (
                   <TableRow key={consultant.id} className="hover:bg-secondary/20 transition-colors">
                     <TableCell className="font-medium">{consultant.name}</TableCell>
@@ -328,15 +355,10 @@ export default function Equipe() {
                       {formatPaymentType(consultant.payment_type)}
                     </TableCell>
                     <TableCell className="text-sm font-medium">
-                      {currencyFormatter.format(
-                        calculatePersonMonthlyCommission(
-                          contracts,
-                          consultant.name,
-                          filter.month,
-                          filter.year,
-                          settings,
-                        ).total,
-                      )}
+                      {currencyFormatter.format(remuneracao)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {currencyFormatter.format(remuneracao + getAjudaCusto(consultant))}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.phone || '—'}
