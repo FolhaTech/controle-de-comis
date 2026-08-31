@@ -134,9 +134,22 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
         const body = await res.json()
         const rows: Record<string, any>[] = body?.data ?? []
 
+        // "11 - Confecção inicial" is the labor-law (trabalhista) intake step: it
+        // has no reliable payment confirmation, so once a client's case reaches
+        // "05.1 - Financeiro link Pgto" that's the authoritative record and the
+        // trabalhista intake row for that same client name should be ignored.
+        const TASK_FINANCEIRO = '05.1 - Financeiro link Pgto'
+        const TASK_TRABALHISTA = '11 - Confecção inicial'
+        const namesWithFinanceiro = new Set<string>()
+        for (const r of rows) {
+          if (r.nom_tarefa === TASK_FINANCEIRO && typeof r.Cliente === 'string' && r.Cliente.trim()) {
+            namesWithFinanceiro.add(r.Cliente.trim().toLowerCase())
+          }
+        }
+
         // The view can list the same processo_id more than once (one row per
-        // workflow step touch). When that happens, prefer whichever copy has
-        // an actual valor_pagto over a duplicate where it's 0/empty.
+        // workflow step touch). When that happens, prefer the Financeiro row,
+        // then whichever copy has an actual valor_pagto over a 0/empty one.
         const bestRowByProcessId = new Map<string, Record<string, any>>()
         for (const r of rows) {
           const processId = String(r.processo_id ?? r.id ?? '')
@@ -146,6 +159,14 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             bestRowByProcessId.set(processId, r)
             continue
           }
+          const existingIsFinanceiro = existing.nom_tarefa === TASK_FINANCEIRO
+          const candidateIsFinanceiro = r.nom_tarefa === TASK_FINANCEIRO
+          if (!existingIsFinanceiro && candidateIsFinanceiro) {
+            bestRowByProcessId.set(processId, r)
+            continue
+          }
+          if (existingIsFinanceiro && !candidateIsFinanceiro) continue
+
           const existingHasValue = (parseNumericValue(existing.valor_pagto ?? existing.valor) ?? 0) > 0
           const candidateHasValue = (parseNumericValue(r.valor_pagto ?? r.valor) ?? 0) > 0
           if (!existingHasValue && candidateHasValue) {
@@ -155,6 +176,12 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
 
         const contracts: Contract[] = []
         for (const [processId, r] of bestRowByProcessId) {
+          const isTrabalhista = r.nom_tarefa === TASK_TRABALHISTA
+          if (isTrabalhista) {
+            const name = typeof r.Cliente === 'string' ? r.Cliente.trim().toLowerCase() : ''
+            if (name && namesWithFinanceiro.has(name)) continue
+          }
+
           contracts.push({
             id: processId,
             name: r.name ?? r.nom_tarefa ?? null,
@@ -162,6 +189,9 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             client_cpf: r.CPF ?? r.client_cpf ?? null,
             client_phone: r.client_phone ?? null,
             client_email: r.client_email ?? null,
+            consultant_id: null,
+            pre_processual_agent_id: null,
+            service_type: isTrabalhista ? 'Trabalhista' : null,
             contracted_value: parseNumericValue(r.valor_pagto ?? r.valor),
             commission_base_value: parseNumericValue(r.valor_desconto_forma_pagamento),
             entry_value: parseNumericValue(r.Entrada),
@@ -178,6 +208,8 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
                   ? new Date(r.Data_Execucao).toISOString()
                   : null,
             end_date_planned: r.end_date_planned ?? null,
+            cancellation_date: null,
+            cancellation_reason: null,
             internal_failure: r.internal_failure ?? null,
             manager: r.manager ?? null,
             address: r.address ?? null,

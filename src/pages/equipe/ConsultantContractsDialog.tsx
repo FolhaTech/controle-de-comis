@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import {
   isContractValid,
   calculateCommissionBreakdown,
+  calculateAttendantCommission,
   contractValue as valueOf,
 } from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
@@ -121,6 +122,12 @@ export function ConsultantContractsDialog({
   const breakdown = calculateCommissionBreakdown(personContracts, settings)
   const commissionByContractId = new Map(breakdown.items.map((item) => [item.contract.id, item]))
 
+  const trabalhistaContracts = personContracts.filter(
+    (c) => c.service_type === 'Trabalhista' && isContractValid(c),
+  )
+  const trabalhista = calculateAttendantCommission(trabalhistaContracts.length, settings)
+  const totalAReceber = breakdown.total + trabalhista.commissionValue
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden">
@@ -142,9 +149,10 @@ export function ConsultantContractsDialog({
                 <strong className="text-foreground">{currencyFormatter.format(totalValue)}</strong>
               </span>
               <span>
-                A Receber ({breakdown.basePercentage}%):{' '}
+                A Receber ({breakdown.basePercentage}%
+                {trabalhistaContracts.length > 0 ? ' + trabalhista' : ''}):{' '}
                 <strong className="text-primary">
-                  {currencyFormatter.format(breakdown.total)}
+                  {currencyFormatter.format(totalAReceber)}
                 </strong>
               </span>
             </div>
@@ -219,6 +227,7 @@ export function ConsultantContractsDialog({
                 <>
                   {personContracts.map((c) => {
                     const item = commissionByContractId.get(c.id)
+                    const isTrabalhista = c.service_type === 'Trabalhista'
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.client || c.name || '—'}</TableCell>
@@ -226,10 +235,14 @@ export function ConsultantContractsDialog({
                           {currencyFormatter.format(valueOf(c))}
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap text-muted-foreground">
-                          {item ? `${item.percentage.toFixed(1)}%` : '—'}
+                          {isTrabalhista ? 'Trabalhista' : item ? `${item.percentage.toFixed(1)}%` : '—'}
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap font-medium text-primary">
-                          {item ? currencyFormatter.format(item.commissionValue) : '—'}
+                          {isTrabalhista
+                            ? currencyFormatter.format(trabalhista.valuePerContract)
+                            : item
+                              ? currencyFormatter.format(item.commissionValue)
+                              : '—'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {c.start_date ? format(new Date(c.start_date), 'dd/MM/yyyy') : '—'}
@@ -245,7 +258,7 @@ export function ConsultantContractsDialog({
                   <TableRow className="bg-secondary/30 font-semibold">
                     <TableCell colSpan={3}>Total a Receber</TableCell>
                     <TableCell className="text-right whitespace-nowrap text-primary">
-                      {currencyFormatter.format(breakdown.total)}
+                      {currencyFormatter.format(totalAReceber)}
                     </TableCell>
                     <TableCell colSpan={2} />
                   </TableRow>

@@ -1,7 +1,12 @@
 import { createRoot } from 'react-dom/client'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { calculateCommissionBreakdown, contractValue, isContractValid } from '@/lib/calculations'
+import {
+  calculateAttendantCommission,
+  calculateCommissionBreakdown,
+  contractValue,
+  isContractValid,
+} from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
 
 const currency = (value: number) =>
@@ -47,13 +52,20 @@ function PremiacaoTemplate({ consultant, contracts, settings, month, year }: Pre
   )
 
   const breakdown = calculateCommissionBreakdown(personContracts, settings)
-  const validCount = personContracts.filter(isContractValid).length
-  const validTotalValue = breakdown.items.reduce((sum, i) => sum + contractValue(i.contract), 0)
+  const trabalhistaContracts = personContracts.filter(
+    (c) => c.service_type === 'Trabalhista' && isContractValid(c),
+  )
+  const trabalhista = calculateAttendantCommission(trabalhistaContracts.length, settings)
+  const totalPremiacao = breakdown.total + trabalhista.commissionValue
+
+  const validContracts = personContracts.filter(isContractValid)
+  const validCount = validContracts.length
+  const validTotalValue = validContracts.reduce((sum, c) => sum + contractValue(c), 0)
   const ticketMedio = validCount > 0 ? validTotalValue / validCount : 0
 
   const ajudaCusto = consultant.fixed_salary || 0
   const canceladosTotal = cancelledContracts.reduce((sum, c) => sum + contractValue(c), 0)
-  const totalNotaFiscal = breakdown.total + ajudaCusto - canceladosTotal
+  const totalNotaFiscal = totalPremiacao + ajudaCusto - canceladosTotal
 
   const itemsByContractId = new Map(breakdown.items.map((i) => [i.contract.id, i]))
 
@@ -95,7 +107,7 @@ function PremiacaoTemplate({ consultant, contracts, settings, month, year }: Pre
           <SummaryRowCentered label="TICKET MÉDIO" value={currency(ticketMedio)} />
           <SummaryRowCentered label="META ATINGIDA" value={`${validCount} Contratos`} />
         </div>
-        <SummaryRow label="Premiação" value={currency(breakdown.total)} navy={navy} />
+        <SummaryRow label="Premiação" value={currency(totalPremiacao)} navy={navy} />
         <SummaryRow label="Ajuda de custo" value={currency(ajudaCusto)} navy={navy} />
         <SummaryRow label="Cancelados (-)" value={currency(canceladosTotal)} navy={navy} />
         <SummaryRow label="Total Nota Fiscal" value={currency(totalNotaFiscal)} navy={navy} bold />
@@ -156,14 +168,21 @@ function PremiacaoTemplate({ consultant, contracts, settings, month, year }: Pre
         <tbody>
           {personContracts.map((c, idx) => {
             const item = itemsByContractId.get(c.id)
+            const isTrabalhista = c.service_type === 'Trabalhista'
             return (
               <tr key={c.id} style={{ background: idx % 2 === 0 ? '#f2f2f2' : '#ffffff' }}>
                 <td style={cellStyle('left')}>{c.client || c.name || '—'}</td>
                 <td style={cellStyle('left')}>{c.service_type || '—'}</td>
                 <td style={cellStyle('right')}>{currency(contractValue(c))}</td>
-                <td style={cellStyle('right')}>{item ? `${item.percentage.toFixed(1)}%` : '—'}</td>
                 <td style={cellStyle('right')}>
-                  {item ? currency(item.commissionValue) : currency(0)}
+                  {isTrabalhista ? '—' : item ? `${item.percentage.toFixed(1)}%` : '—'}
+                </td>
+                <td style={cellStyle('right')}>
+                  {isTrabalhista
+                    ? currency(trabalhista.valuePerContract)
+                    : item
+                      ? currency(item.commissionValue)
+                      : currency(0)}
                 </td>
               </tr>
             )
@@ -181,7 +200,7 @@ function PremiacaoTemplate({ consultant, contracts, settings, month, year }: Pre
             <td colSpan={4} style={cellStyle('right')}>
               Total
             </td>
-            <td style={cellStyle('right')}>{currency(breakdown.total)}</td>
+            <td style={cellStyle('right')}>{currency(totalPremiacao)}</td>
           </tr>
         </tfoot>
       </table>

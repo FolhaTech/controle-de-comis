@@ -7,7 +7,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { countValidContractsByPerson, calculateAttendantCommission } from '@/lib/calculations'
+import { calculateTrabalhistaCommission } from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -29,15 +29,15 @@ export function AttendantCommissionTable({
   year,
   loading = false,
 }: AttendantCommissionTableProps) {
-  const attendants = consultants.filter((c) => c.type === 'atendente')
+  const rows = consultants
+    .map((consultant) => ({
+      consultant,
+      ...calculateTrabalhistaCommission(contracts, consultant.name, month, year, settings),
+    }))
+    .filter((row) => row.contractCount > 0)
+    .sort((a, b) => b.commissionValue - a.commissionValue)
 
-  const rows = attendants.map((attendant) => {
-    const contractCount = countValidContractsByPerson(contracts, attendant.name, month, year)
-    const commission = calculateAttendantCommission(contractCount, settings)
-    return { attendant, ...commission }
-  })
-
-  const totalGeral = rows.reduce((sum, r) => sum + r.total, 0)
+  const totalGeral = rows.reduce((sum, r) => sum + r.commissionValue, 0)
   const monthLabel = String(month).padStart(2, '0')
 
   return (
@@ -47,7 +47,8 @@ export function AttendantCommissionTable({
           Comissão de Atendimento (Setor Trabalhista)
         </h3>
         <p className="text-xs text-muted-foreground">
-          Ajuda de custo + comissão por contrato fechado em {monthLabel}/{year}
+          Recorte trabalhista da comissão de {monthLabel}/{year} — R$ fixo por contrato, por
+          faixa de quantidade
         </p>
       </div>
 
@@ -55,53 +56,48 @@ export function AttendantCommissionTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-secondary/40">
-              <TableHead>Atendente</TableHead>
-              <TableHead className="text-right">Contratos Fechados</TableHead>
+              <TableHead>Consultor</TableHead>
+              <TableHead className="text-right">Contratos Trabalhistas</TableHead>
               <TableHead className="text-right">Valor / Contrato</TableHead>
-              <TableHead className="text-right">Comissão</TableHead>
-              <TableHead className="text-right">Ajuda de Custo</TableHead>
-              <TableHead className="text-right font-semibold">Total</TableHead>
+              <TableHead className="text-right font-semibold">Comissão Trabalhista</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={4}>
                     <Skeleton className="h-8 w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhum atendente cadastrado.
+                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  Nenhum contrato trabalhista nesta competência.
                 </TableCell>
               </TableRow>
             ) : (
               <>
                 {rows.map((row) => (
-                  <TableRow key={row.attendant.id} className="hover:bg-secondary/20 transition-colors">
-                    <TableCell className="font-medium">{row.attendant.name}</TableCell>
+                  <TableRow
+                    key={row.consultant.id}
+                    className="hover:bg-secondary/20 transition-colors"
+                  >
+                    <TableCell className="font-medium">{row.consultant.name}</TableCell>
                     <TableCell className="text-right">{row.contractCount}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {row.valuePerContract === 0
                         ? '—'
                         : currencyFormatter.format(row.valuePerContract)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {currencyFormatter.format(row.commissionValue)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {currencyFormatter.format(row.baseAllowance)}
-                    </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
-                      {currencyFormatter.format(row.total)}
+                      {currencyFormatter.format(row.commissionValue)}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-secondary/30 font-semibold">
-                  <TableCell colSpan={5}>Total Geral</TableCell>
+                  <TableCell colSpan={3}>Total Geral</TableCell>
                   <TableCell className="text-right text-primary">
                     {currencyFormatter.format(totalGeral)}
                   </TableCell>

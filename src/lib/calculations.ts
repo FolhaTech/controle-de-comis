@@ -83,9 +83,13 @@ export function buildPersonMonthlyTotals(
     .map((name) => {
       const monthsBuckets =
         contractsByPersonMonth.get(normalize(name)) || Array.from({ length: 12 }, () => [])
-      const months = monthsBuckets.map(
-        (monthContracts) => calculateCommissionBreakdown(monthContracts, settings).total,
-      )
+      const months = monthsBuckets.map((monthContracts) => {
+        const breakdown = calculateCommissionBreakdown(monthContracts, settings)
+        const trabalhistaCount = monthContracts.filter(
+          (c) => c.service_type === 'Trabalhista' && isContractValid(c),
+        ).length
+        return breakdown.total + calculateAttendantCommission(trabalhistaCount, settings).commissionValue
+      })
       return { name, months, total: months.reduce((sum, v) => sum + v, 0) }
     })
     .sort((a, b) => b.total - a.total)
@@ -130,8 +134,11 @@ export interface CommissionBreakdownItem {
   commissionValue: number
 }
 
+// Trabalhista contracts are never billed as a percentage of value — they're
+// charged per-contract via calculateAttendantCommission's tiers instead, so
+// they're excluded here entirely (see calculatePersonMonthlyCommission).
 export function calculateCommissionBreakdown(contracts: Contract[], settings: Settings) {
-  const validContracts = contracts.filter(isContractValid)
+  const validContracts = contracts.filter((c) => c.service_type !== 'Trabalhista' && isContractValid(c))
   const count = validContracts.length
 
   const tier = settings.tiers.find((t) => count >= t.min && count <= t.max)
@@ -161,6 +168,27 @@ export function calculateCommissionBreakdown(contracts: Contract[], settings: Se
   return { basePercentage, items, baseCommission, bonusValue: total - baseCommission, total }
 }
 
+function filterPersonPeriodContracts(
+  contracts: Contract[],
+  personName: string,
+  month: number,
+  year: number,
+) {
+  const normalize = (value: string) => value.trim().toLowerCase()
+  const target = normalize(personName)
+  const now = new Date()
+
+  return contracts.filter((c) => {
+    if (!c.closed_by || normalize(c.closed_by) !== target) return false
+    if (!c.start_date) return false
+    const d = new Date(c.start_date)
+    return d.getMonth() + 1 === month && d.getFullYear() === year && d <= now
+  })
+}
+
+// Trabalhista contracts are billed per-contract (see calculateAttendantCommission's
+// tiers), not as a percentage of value, so their commission is computed
+// separately here and added on top of the regular value-based breakdown.
 export function calculatePersonMonthlyCommission(
   contracts: Contract[],
   personName: string,
@@ -168,18 +196,38 @@ export function calculatePersonMonthlyCommission(
   year: number,
   settings: Settings,
 ) {
-  const normalize = (value: string) => value.trim().toLowerCase()
-  const target = normalize(personName)
-  const now = new Date()
+  const personContracts = filterPersonPeriodContracts(contracts, personName, month, year)
+  const breakdown = calculateCommissionBreakdown(personContracts, settings)
 
-  const personContracts = contracts.filter((c) => {
-    if (!c.closed_by || normalize(c.closed_by) !== target) return false
-    if (!c.start_date) return false
-    const d = new Date(c.start_date)
-    return d.getMonth() + 1 === month && d.getFullYear() === year && d <= now
-  })
+  const trabalhistaCount = personContracts.filter(
+    (c) => c.service_type === 'Trabalhista' && isContractValid(c),
+  ).length
+  const trabalhista = calculateAttendantCommission(trabalhistaCount, settings)
 
-  return calculateCommissionBreakdown(personContracts, settings)
+  return {
+    ...breakdown,
+    trabalhistaContractCount: trabalhistaCount,
+    trabalhistaValuePerContract: trabalhista.valuePerContract,
+    trabalhistaCommissionValue: trabalhista.commissionValue,
+    total: breakdown.total + trabalhista.commissionValue,
+  }
+}
+
+// Isolates just the Trabalhista slice of a person's monthly commission — a
+// read-only breakout of what calculatePersonMonthlyCommission already computes.
+export function calculateTrabalhistaCommission(
+  contracts: Contract[],
+  personName: string,
+  month: number,
+  year: number,
+  settings: Settings,
+) {
+  const result = calculatePersonMonthlyCommission(contracts, personName, month, year, settings)
+  return {
+    contractCount: result.trabalhistaContractCount,
+    valuePerContract: result.trabalhistaValuePerContract,
+    commissionValue: result.trabalhistaCommissionValue,
+  }
 }
 
 export function calculateCommission(contracts: Contract[], settings: Settings) {
