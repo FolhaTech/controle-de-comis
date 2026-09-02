@@ -104,6 +104,13 @@ function normalizePaymentMethod(value: unknown): string | null {
   return value
 }
 
+// Competências before this date were already closed and paid out under the
+// old rule (payment date only, no signature check) — applying the grace
+// window retroactively would reclassify already-paid contracts into a later
+// month and double-count them. The grace window only applies to payments on
+// or after this cutoff.
+const GRACE_WINDOW_CUTOFF = new Date(2026, 7, 1) // 2026-08-01
+
 // The competência is the payment date's own month, unless payment landed in
 // the last 2 days of the month and the signature paperwork
 // (data_assinatura_contrato) trails into the following month: the cutoff is
@@ -117,7 +124,7 @@ function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknow
   const lastDayOfMonth = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0).getDate()
   const isNearMonthEnd = paymentDate.getDate() >= lastDayOfMonth - 1
 
-  if (!isNearMonthEnd || typeof signatureDateStr !== 'string' || !signatureDateStr) {
+  if (paymentDate < GRACE_WINDOW_CUTOFF || !isNearMonthEnd || typeof signatureDateStr !== 'string' || !signatureDateStr) {
     return paymentDate
   }
 
