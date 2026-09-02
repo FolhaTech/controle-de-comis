@@ -3,7 +3,13 @@ import { Consultant } from '@/lib/types'
 const TEAM_MEMBERS_STORAGE_KEY = 'controle-de-comis-team-members'
 
 // System/bot accounts and manually-added entries that should not appear as team members.
-const EXCLUDED_NAMES = new Set(['robo cadastro cliente', 'tiago izaias'])
+const EXCLUDED_NAMES = new Set([
+  'robo cadastro cliente',
+  'tiago izaias',
+  'automacao.preprocessual',
+  'suporte genter',
+  'colchao',
+])
 
 function loadTeamMembers(): Consultant[] {
   const stored = localStorage.getItem(TEAM_MEMBERS_STORAGE_KEY)

@@ -186,9 +186,16 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           }
         }
 
-        // The view can list the same processo_id more than once (one row per
-        // workflow step touch). When that happens, prefer the Financeiro row,
-        // then whichever copy has an actual valor_pagto over a 0/empty one.
+        // The API can list the same processo_id more than once — one row per
+        // workflow step touch, now including clients who've paid but whose
+        // process hasn't reached Financeiro/Trabalhista yet. Prefer, in order:
+        // the Financeiro row, then the Trabalhista row, then whichever copy
+        // has an actual valor_pagto over a 0/empty one.
+        const taskPriority = (task: unknown) => {
+          if (task === TASK_FINANCEIRO) return 2
+          if (task === TASK_TRABALHISTA) return 1
+          return 0
+        }
         const bestRowByProcessId = new Map<string, Record<string, any>>()
         for (const r of rows) {
           const processId = String(r.processo_id ?? r.id ?? '')
@@ -198,17 +205,28 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             bestRowByProcessId.set(processId, r)
             continue
           }
-          const existingIsFinanceiro = existing.nom_tarefa === TASK_FINANCEIRO
-          const candidateIsFinanceiro = r.nom_tarefa === TASK_FINANCEIRO
-          if (!existingIsFinanceiro && candidateIsFinanceiro) {
+          const existingPriority = taskPriority(existing.nom_tarefa)
+          const candidatePriority = taskPriority(r.nom_tarefa)
+          if (candidatePriority > existingPriority) {
             bestRowByProcessId.set(processId, r)
             continue
           }
-          if (existingIsFinanceiro && !candidateIsFinanceiro) continue
+          if (candidatePriority < existingPriority) continue
 
           const existingHasValue = (parseNumericValue(existing.valor_pagto ?? existing.valor) ?? 0) > 0
           const candidateHasValue = (parseNumericValue(r.valor_pagto ?? r.valor) ?? 0) > 0
-          if (!existingHasValue && candidateHasValue) {
+          if (candidateHasValue && !existingHasValue) {
+            bestRowByProcessId.set(processId, r)
+            continue
+          }
+          if (existingHasValue && !candidateHasValue) continue
+
+          // Same priority tier, both (or neither) have a value — the contract
+          // terms can get revised across touches, so prefer whichever was
+          // created most recently.
+          const existingCreated = existing.Data_Criacao ? new Date(existing.Data_Criacao).getTime() : 0
+          const candidateCreated = r.Data_Criacao ? new Date(r.Data_Criacao).getTime() : 0
+          if (candidateCreated > existingCreated) {
             bestRowByProcessId.set(processId, r)
           }
         }
@@ -257,7 +275,13 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             budget_planned: null,
             progress_percentage: null,
             total_area: null,
-            closed_by: parseClosedByName(r.inserrido_pgto),
+            // nome_solicitante (who opened the client) is the reliable
+            // attribution field — inserrido_pgto (who keyed in the payment)
+            // can name a different person entirely, including administrative
+            // staff who process payments on behalf of the actual consultant.
+            closed_by: typeof r.nome_solicitante === 'string' && r.nome_solicitante.trim()
+              ? r.nome_solicitante.trim()
+              : parseClosedByName(r.inserrido_pgto),
           })
         }
 

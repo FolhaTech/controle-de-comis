@@ -47,15 +47,16 @@ app.get('/api/inserrido-pgto', async (req, res) => {
   let conn
   try {
     conn = await getConnection()
+    // nome_solicitante (who opened the client) is the same attribution field
+    // used to build each contract's closed_by — keep the team roster in sync
+    // with it, rather than the less reliable inserrido_pgto (who happened to
+    // key in the payment, which can be a different person entirely).
     const [rows] = await conn.execute(
-      `SELECT DISTINCT inserrido_pgto FROM vw_formas_pagamentos WHERE inserrido_pgto IS NOT NULL AND inserrido_pgto <> ''`,
+      `SELECT DISTINCT nome_solicitante FROM mod_cad_clientes WHERE nome_solicitante IS NOT NULL AND nome_solicitante <> ''`,
     )
     const names = new Set()
     for (const row of rows || []) {
-      const raw = row.inserrido_pgto
-      if (!raw) continue
-      const separatorIndex = raw.indexOf(' - ')
-      const name = (separatorIndex === -1 ? raw : raw.slice(0, separatorIndex)).trim()
+      const name = (row.nome_solicitante || '').trim()
       if (name) names.add(name)
     }
     res.json({ names: Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR')) })
@@ -67,6 +68,36 @@ app.get('/api/inserrido-pgto', async (req, res) => {
   }
 })
 
+// Built directly off the same base tables vw_formas_pagamentos joins (see
+// SHOW CREATE VIEW vw_formas_pagamentos), but deliberately broader/richer:
+//   - no restriction to nom_tarefa IN ('05.1...', '11...') — the view's filter
+//     silently drops clients who've already paid but whose process hasn't
+//     reached one of those two workflow steps yet (e.g. still stuck at
+//     "07 - Solicitação/Validação de documentos").
+//   - adds T3.nome_solicitante (who opened/originated the client) — the
+//     correct field for attributing a contract to a consultant. T4.inserrido_pgto
+//     (who happened to key in the payment) is a different, less reliable
+//     signal: it can name whoever did data entry, sometimes disagreeing with
+//     nome_solicitante entirely.
+const FORMAS_PAGAMENTOS_QUERY = `
+  SELECT DISTINCT T2.processo_id AS processo_id, T1.dat_abertura AS Data_Abertura, T2.dat_criacao AS Data_Criacao,
+         T2.dat_limite AS Data_Limite, T2.dat_execucao AS Data_Execucao,
+         T3.cpf_cliente AS CPF, T3.nome_cliente AS Cliente, T3.nome_solicitante AS nome_solicitante, T2.nom_tarefa AS nom_tarefa,
+         T3.data_pgto_cliente AS data_pgto_cliente, T3.data_assinatura_contrato AS data_assinatura_contrato,
+         (CASE WHEN T4.formas_pgto_cliente = 1 THEN 'Pix' WHEN T4.formas_pgto_cliente = 2 THEN 'Crédito'
+               WHEN T4.formas_pgto_cliente = 3 THEN 'Boleto' WHEN T4.formas_pgto_cliente = 4 THEN 'À Vista' END) AS Formas_Pagamento,
+         T4.quant_parcelas AS Qtd_Parcelas, T4.valor_entrada_pgto AS Entrada, T4.porcentagem_desc_pgto AS Porcentual_desconto,
+         T4.valor_parcela_pgto AS valor_parcela_pgto, T4.val_desc_pgto AS val_desc_pgto, T4.valor_pagto AS valor_pagto,
+         T4.valor_desconto_forma_pagamento AS valor_desconto_forma_pagamento, T4.valor_do_des_pagto_cliente AS valor_do_des_pagto_cliente,
+         T4.data_entrada_pgto AS data_entrada_pgto, T4.data_venc_parcela AS data_venc_parcela, T4.compro_pagto AS compro_pagto,
+         T4.descr_doc_comp AS descr_doc_comp, T4.inserrido_pgto AS inserrido_pgto, T4.resumo_pgto_clie AS resumo_pgto_clie
+  FROM gdp_processo T1
+  JOIN gdp_processo_tarefa T2 ON T1.id = T2.processo_id
+  JOIN mod_cad_clientes T3 ON T2.id = T3.processo_tarefa_id
+  JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T3.id = T4.cad_clientes_id
+  WHERE T4.valor_pagto IS NOT NULL
+`
+
 app.get('/api/vw_formas_pagamentos', async (req, res) => {
   let conn
   try {
@@ -76,13 +107,13 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
     const limitParam = req.query.limit
     const limit = limitParam === undefined || limitParam === '' ? null : Number(limitParam)
 
-    let query = 'SELECT * FROM vw_formas_pagamentos'
+    let query = FORMAS_PAGAMENTOS_QUERY
     const params = []
     if (startDate && nextStartDate) {
-      query += ' WHERE COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) >= ? AND COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) < ?'
+      query += ' AND COALESCE(T3.data_pgto_cliente, T4.data_entrada_pgto, T2.dat_execucao) >= ? AND COALESCE(T3.data_pgto_cliente, T4.data_entrada_pgto, T2.dat_execucao) < ?'
       params.push(startDate, nextStartDate)
     }
-    query += ' ORDER BY COALESCE(data_pgto_cliente, data_entrada_pgto, Data_Execucao) DESC'
+    query += ' ORDER BY COALESCE(T3.data_pgto_cliente, T4.data_entrada_pgto, T2.dat_execucao) DESC'
     if (limit !== null && Number.isFinite(limit) && limit > 0) {
       query += ' LIMIT ?'
       params.push(limit)
