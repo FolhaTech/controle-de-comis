@@ -239,10 +239,12 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             if (name && namesWithFinanceiro.has(name)) continue
           }
 
-          const paymentDateStr: string | null =
-            r.data_pgto_cliente ?? r.data_entrada_pgto ?? r.Data_Execucao ?? null
-          const startDate = paymentDateStr
-            ? resolveCompetenciaDate(paymentDateStr, r.data_assinatura_contrato)
+          // Without a confirmed data_pgto_cliente, the contract doesn't count
+          // toward any competência yet — no falling back to data_entrada_pgto
+          // or Data_Execucao. Once it's filled in, the end-of-month grace
+          // window (resolveCompetenciaDate) applies as usual.
+          const startDate = r.data_pgto_cliente
+            ? resolveCompetenciaDate(r.data_pgto_cliente, r.data_assinatura_contrato)
             : null
 
           contracts.push({
