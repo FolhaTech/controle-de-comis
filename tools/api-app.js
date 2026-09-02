@@ -69,16 +69,19 @@ app.get('/api/inserrido-pgto', async (req, res) => {
 })
 
 // Built directly off the same base tables vw_formas_pagamentos joins (see
-// SHOW CREATE VIEW vw_formas_pagamentos), but deliberately broader/richer:
-//   - no restriction to nom_tarefa IN ('05.1...', '11...') — the view's filter
-//     silently drops clients who've already paid but whose process hasn't
-//     reached one of those two workflow steps yet (e.g. still stuck at
-//     "07 - Solicitação/Validação de documentos").
-//   - adds T3.nome_solicitante (who opened/originated the client) — the
-//     correct field for attributing a contract to a consultant. T4.inserrido_pgto
+// SHOW CREATE VIEW vw_formas_pagamentos) — same nom_tarefa restriction as the
+// view (only counts a contract once it's reached "05.1 - Financeiro link Pgto"
+// or "11 - Confecção inicial", i.e. payment confirmed via data_pgto_cliente or
+// the case is a recognized Trabalhista intake), but adds two things the view
+// doesn't expose:
+//   - T3.nome_solicitante (who opened/originated the client) — the correct
+//     field for attributing a contract to a consultant. T4.inserrido_pgto
 //     (who happened to key in the payment) is a different, less reliable
 //     signal: it can name whoever did data entry, sometimes disagreeing with
 //     nome_solicitante entirely.
+//   - T3.acao_cli (the real practice-area/case-type label) — lets the UI show
+//     why the same client/CPF can legitimately appear more than once (two
+//     separate matters), instead of looking like a duplicate.
 const FORMAS_PAGAMENTOS_QUERY = `
   SELECT DISTINCT T2.processo_id AS processo_id, T1.dat_abertura AS Data_Abertura, T2.dat_criacao AS Data_Criacao,
          T2.dat_limite AS Data_Limite, T2.dat_execucao AS Data_Execucao,
@@ -97,6 +100,7 @@ const FORMAS_PAGAMENTOS_QUERY = `
   JOIN mod_cad_clientes T3 ON T2.id = T3.processo_tarefa_id
   JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T3.id = T4.cad_clientes_id
   WHERE T4.valor_pagto IS NOT NULL
+    AND (T2.nom_tarefa = '05.1 - Financeiro link Pgto' OR T2.nom_tarefa = '11 - Confecção inicial')
 `
 
 app.get('/api/vw_formas_pagamentos', async (req, res) => {
