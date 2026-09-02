@@ -104,6 +104,41 @@ function normalizePaymentMethod(value: unknown): string | null {
   return value
 }
 
+// The competência is normally just the payment date's own month. But when
+// payment lands in the last 2 days of a month, the signature paperwork often
+// isn't collected until a few days into the next month — so we give it a
+// grace window: signed by day 3 of the next month still counts for the
+// payment's (earlier) month; signed day 4+ rolls the contract into the
+// signature's month instead.
+function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknown): Date {
+  const paymentDate = new Date(paymentDateStr)
+  const lastDayOfMonth = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0).getDate()
+  const isNearMonthEnd = paymentDate.getDate() >= lastDayOfMonth - 1
+
+  if (!isNearMonthEnd || typeof signatureDateStr !== 'string' || !signatureDateStr) {
+    return paymentDate
+  }
+
+  const signatureDate = new Date(signatureDateStr)
+  if (Number.isNaN(signatureDate.getTime())) return paymentDate
+
+  const sameMonthAsPayment =
+    signatureDate.getFullYear() === paymentDate.getFullYear() &&
+    signatureDate.getMonth() === paymentDate.getMonth()
+  if (sameMonthAsPayment) return paymentDate
+
+  const nextMonthDate = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 1)
+  const isImmediateNextMonth =
+    signatureDate.getFullYear() === nextMonthDate.getFullYear() &&
+    signatureDate.getMonth() === nextMonthDate.getMonth()
+
+  if (isImmediateNextMonth && signatureDate.getDate() <= 3) {
+    return paymentDate
+  }
+
+  return signatureDate
+}
+
 export async function fetchContracts(): Promise<{ data: Contract[] | null; error: any }> {
   // Helper to deduplicate contracts by id or composite key
   const uniqueContracts = (items: Contract[]) => {
@@ -182,6 +217,12 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             if (name && namesWithFinanceiro.has(name)) continue
           }
 
+          const paymentDateStr: string | null =
+            r.data_pgto_cliente ?? r.data_entrada_pgto ?? r.Data_Execucao ?? null
+          const startDate = paymentDateStr
+            ? resolveCompetenciaDate(paymentDateStr, r.data_assinatura_contrato)
+            : null
+
           contracts.push({
             id: processId,
             name: r.name ?? r.nom_tarefa ?? null,
@@ -200,13 +241,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
             status: r.status ?? 'Ativo',
-            start_date: r.data_pgto_cliente
-              ? new Date(r.data_pgto_cliente).toISOString()
-              : r.data_entrada_pgto
-                ? new Date(r.data_entrada_pgto).toISOString()
-                : r.Data_Execucao
-                  ? new Date(r.Data_Execucao).toISOString()
-                  : null,
+            start_date: startDate ? startDate.toISOString() : null,
             end_date_planned: r.end_date_planned ?? null,
             cancellation_date: null,
             cancellation_reason: null,
