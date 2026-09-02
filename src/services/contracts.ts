@@ -238,8 +238,15 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           }
         }
 
+        // Confirmed by the firm to be an erroneous duplicate case for this
+        // client (Tawanny Riul Salomao — "Saúde - Reembolso integral"
+        // R$3.000, under Camila Salles) — excluded from commission counting
+        // at their request rather than edited in the source database.
+        const EXCLUDED_PROCESS_IDS = new Set<string>(['24069'])
+
         const contracts: Contract[] = []
         for (const [processId, r] of bestRowByProcessId) {
+          if (EXCLUDED_PROCESS_IDS.has(processId)) continue
           const isTrabalhista = r.nom_tarefa === TASK_TRABALHISTA
           if (isTrabalhista) {
             const name = typeof r.Cliente === 'string' ? r.Cliente.trim().toLowerCase() : ''
