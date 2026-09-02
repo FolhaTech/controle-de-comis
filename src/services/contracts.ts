@@ -104,12 +104,14 @@ function normalizePaymentMethod(value: unknown): string | null {
   return value
 }
 
-// The competência is normally just the payment date's own month. But when
-// payment lands in the last 2 days of a month, the signature paperwork often
-// isn't collected until a few days into the next month — so we give it a
-// grace window: signed by day 3 of the next month still counts for the
-// payment's (earlier) month; signed day 4+ rolls the contract into the
-// signature's month instead.
+// The competência is the payment date's own month, unless payment landed in
+// the last 2 days of the month and the signature paperwork
+// (data_assinatura_contrato) trails into the following month: the cutoff is
+// day 3 — signed by day 3 of the next month still counts for the payment's
+// month, signed day 4+ rolls the contract into the (immediate) next month.
+// Only ever shifts by exactly one month — a signature far from the payment
+// date (a different month entirely, often a data-entry typo) is ignored and
+// the payment's own month is kept.
 function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknown): Date {
   const paymentDate = new Date(paymentDateStr)
   const lastDayOfMonth = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0).getDate()
@@ -132,11 +134,13 @@ function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknow
     signatureDate.getFullYear() === nextMonthDate.getFullYear() &&
     signatureDate.getMonth() === nextMonthDate.getMonth()
 
-  if (isImmediateNextMonth && signatureDate.getDate() <= 3) {
-    return paymentDate
+  if (isImmediateNextMonth) {
+    return signatureDate.getDate() <= 3 ? paymentDate : signatureDate
   }
 
-  return signatureDate
+  // Signature isn't in the payment's month nor the immediate next one —
+  // likely a data anomaly, not a genuine trailing signature. Keep payment's month.
+  return paymentDate
 }
 
 export async function fetchContracts(): Promise<{ data: Contract[] | null; error: any }> {
