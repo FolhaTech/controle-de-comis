@@ -98,9 +98,9 @@ const FORMAS_PAGAMENTOS_QUERY = `
   FROM gdp_processo T1
   JOIN gdp_processo_tarefa T2 ON T1.id = T2.processo_id
   JOIN mod_cad_clientes T3 ON T2.id = T3.processo_tarefa_id
-  JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T3.id = T4.cad_clientes_id
-  WHERE T4.valor_pagto IS NOT NULL
-    AND (T2.nom_tarefa = '05.1 - Financeiro link Pgto' OR T2.nom_tarefa = '11 - Confecção inicial')
+  LEFT JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T3.id = T4.cad_clientes_id
+  WHERE (T2.nom_tarefa = '05.1 - Financeiro link Pgto' AND T4.valor_pagto IS NOT NULL)
+     OR T2.nom_tarefa = '11 - Confecção inicial'
 `
 
 app.get('/api/vw_formas_pagamentos', async (req, res) => {

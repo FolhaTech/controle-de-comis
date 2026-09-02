@@ -4,7 +4,14 @@ import { Contract, Settings } from './types'
 // valor_desconto_forma_pagamento (net, after payment-method discount),
 // falling back to the gross contracted value when it isn't available.
 export function contractValue(contract: Contract): number {
-  return contract.commission_base_value ?? contract.contracted_value ?? 0
+  // `commission_base_value` (valor_desconto_forma_pagamento) is sometimes stored as a
+  // literal 0.00 in the DB when it was never actually populated, rather than NULL —
+  // in those rows the real contract value only exists in `contracted_value`. Treating
+  // 0 as "present" here would silently zero out the commission for those contracts.
+  if (contract.commission_base_value != null && contract.commission_base_value > 0) {
+    return contract.commission_base_value
+  }
+  return contract.contracted_value ?? 0
 }
 
 export function isContractValid(contract: Contract) {
