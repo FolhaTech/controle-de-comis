@@ -255,6 +255,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             consultant_id: null,
             pre_processual_agent_id: null,
             service_type: isTrabalhista ? 'Trabalhista' : null,
+            case_type: typeof r.acao_cli === 'string' && r.acao_cli.trim() ? r.acao_cli.trim() : null,
             contracted_value: parseNumericValue(r.valor_pagto ?? r.valor),
             commission_base_value: parseNumericValue(r.valor_desconto_forma_pagamento),
             entry_value: parseNumericValue(r.Entrada),

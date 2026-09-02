@@ -59,6 +59,11 @@ export interface Contract {
   notes: string | null
   total_area: number | null
   closed_by: string | null
+  // Real practice-area/case-type label (acao_cli), e.g. "Saúde - Reparadora" or
+  // "Cível - Declaratória de inexistência de débito" — the same client/CPF can
+  // legitimately have more than one contract in a period when they open
+  // separate matters, and this is what distinguishes them in the UI.
+  case_type: string | null
 }
 
 export interface Settings {

@@ -207,6 +207,7 @@ export function ConsultantContractsDialog({
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Tipo de Ação</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-right">%</TableHead>
                 <TableHead className="text-right">Comissão</TableHead>
@@ -217,7 +218,7 @@ export function ConsultantContractsDialog({
             <TableBody>
               {personContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     {period === 'custom' && !customFrom && !customTo
                       ? 'Selecione a data inicial e/ou final.'
                       : 'Nenhum contrato encontrado para esta competência.'}
@@ -231,6 +232,9 @@ export function ConsultantContractsDialog({
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.client || c.name || '—'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {c.case_type || '—'}
+                        </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
                           {currencyFormatter.format(valueOf(c))}
                         </TableCell>
@@ -256,7 +260,7 @@ export function ConsultantContractsDialog({
                     )
                   })}
                   <TableRow className="bg-secondary/30 font-semibold">
-                    <TableCell colSpan={3}>Total a Receber</TableCell>
+                    <TableCell colSpan={4}>Total a Receber</TableCell>
                     <TableCell className="text-right whitespace-nowrap text-primary">
                       {currencyFormatter.format(totalAReceber)}
                     </TableCell>

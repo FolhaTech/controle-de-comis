@@ -172,7 +172,7 @@ function PremiacaoTemplate({ consultant, contracts, settings, month, year }: Pre
             return (
               <tr key={c.id} style={{ background: idx % 2 === 0 ? '#f2f2f2' : '#ffffff' }}>
                 <td style={cellStyle('left')}>{c.client || c.name || '—'}</td>
-                <td style={cellStyle('left')}>{c.service_type || '—'}</td>
+                <td style={cellStyle('left')}>{c.case_type || c.service_type || '—'}</td>
                 <td style={cellStyle('right')}>{currency(contractValue(c))}</td>
                 <td style={cellStyle('right')}>
                   {isTrabalhista ? '—' : item ? `${item.percentage.toFixed(1)}%` : '—'}

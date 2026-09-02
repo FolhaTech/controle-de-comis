@@ -83,6 +83,7 @@ const FORMAS_PAGAMENTOS_QUERY = `
   SELECT DISTINCT T2.processo_id AS processo_id, T1.dat_abertura AS Data_Abertura, T2.dat_criacao AS Data_Criacao,
          T2.dat_limite AS Data_Limite, T2.dat_execucao AS Data_Execucao,
          T3.cpf_cliente AS CPF, T3.nome_cliente AS Cliente, T3.nome_solicitante AS nome_solicitante, T2.nom_tarefa AS nom_tarefa,
+         T3.acao_cli AS acao_cli,
          T3.data_pgto_cliente AS data_pgto_cliente, T3.data_assinatura_contrato AS data_assinatura_contrato,
          (CASE WHEN T4.formas_pgto_cliente = 1 THEN 'Pix' WHEN T4.formas_pgto_cliente = 2 THEN 'Crédito'
                WHEN T4.formas_pgto_cliente = 3 THEN 'Boleto' WHEN T4.formas_pgto_cliente = 4 THEN 'À Vista' END) AS Formas_Pagamento,
