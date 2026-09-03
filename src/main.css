@@ -106,6 +106,12 @@
   #premiacao-print-root,
   #premiacao-print-root * {
     visibility: visible;
+    /* Chrome drops background colors on print unless the user manually
+       checks "Background graphics" in the print dialog. These force it,
+       so the navy/red/gold fills always show up regardless of that
+       (easy to miss, off by default) setting. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   #premiacao-print-root {
     position: absolute;
