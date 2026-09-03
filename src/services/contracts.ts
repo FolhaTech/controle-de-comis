@@ -59,10 +59,6 @@ function loadContracts(): Contract[] {
   }
 }
 
-function saveContracts(items: Contract[]) {
-  localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(items))
-}
-
 function parseNumericValue(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -275,7 +271,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             : null
 
           // A manual edit overrides only the fields it carries — everything
-          // else (payment method, status, closed_by...) stays as fetched.
+          // else (payment method, status...) stays as fetched.
           const edit = editsByProcessId.get(processId)
           const editedValue = edit?.value != null ? Number(edit.value) : null
           const editedStartDate = edit?.start_date ? new Date(edit.start_date) : null
@@ -319,9 +315,12 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             // attribution field — inserrido_pgto (who keyed in the payment)
             // can name a different person entirely, including administrative
             // staff who process payments on behalf of the actual consultant.
-            closed_by: typeof r.nome_solicitante === 'string' && r.nome_solicitante.trim()
-              ? r.nome_solicitante.trim()
-              : parseClosedByName(r.inserrido_pgto),
+            // A manual edit can reassign this (e.g. a case wrongly attributed
+            // in the CRM, like Andreia de Aguiar's).
+            closed_by: edit?.closed_by ||
+              (typeof r.nome_solicitante === 'string' && r.nome_solicitante.trim()
+                ? r.nome_solicitante.trim()
+                : parseClosedByName(r.inserrido_pgto)),
           })
         }
 
@@ -376,55 +375,3 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
   }
 }
 
-export async function createContract(contract: Partial<Contract>) {
-  const items = loadContracts()
-  const newContract: Contract = {
-    id: crypto.randomUUID(),
-    name: contract.name || contract.client || 'Contrato',
-    client: contract.client || null,
-    client_cpf: contract.client_cpf || null,
-    client_phone: contract.client_phone || null,
-    client_email: contract.client_email || null,
-    contracted_value: contract.contracted_value ?? null,
-    entry_value: contract.entry_value ?? null,
-    entry_payment_method: contract.entry_payment_method || null,
-    payment_method: contract.payment_method || null,
-    installments: contract.installments ?? null,
-    status: contract.status || 'Ativo',
-    start_date: contract.start_date || null,
-    end_date_planned: contract.end_date_planned || null,
-    internal_failure: contract.internal_failure ?? null,
-    manager: contract.manager || null,
-    address: contract.address || null,
-    notes: contract.notes || null,
-    closed_by: contract.closed_by || null,
-    created_at: new Date().toISOString(),
-  }
-  const updated = [newContract, ...items]
-  saveContracts(updated)
-  return { data: newContract, error: null }
-}
-
-export async function updateContract(id: string, updates: Partial<Contract>) {
-  const items = loadContracts()
-  const index = items.findIndex((item) => item.id === id)
-  if (index === -1) {
-    return { data: null, error: 'Contrato não encontrado' }
-  }
-
-  const updatedContract = {
-    ...items[index],
-    ...updates,
-    name: updates.name || updates.client || items[index].name,
-  }
-  const updatedItems = [...items]
-  updatedItems[index] = updatedContract
-  saveContracts(updatedItems)
-  return { data: updatedContract, error: null }
-}
-
-export async function deleteContract(id: string) {
-  const items = loadContracts()
-  saveContracts(items.filter((item) => item.id !== id))
-  return { error: null }
-}

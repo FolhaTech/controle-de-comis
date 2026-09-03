@@ -68,6 +68,7 @@ export type ContractAdjustmentUpdate = {
   case_type?: string | null
   value?: number | null
   start_date?: string | null
+  closed_by?: string
 }
 
 export async function updateContractAdjustment(id: string, updates: ContractAdjustmentUpdate): Promise<{ data: ContractAdjustment | null; error: any }> {

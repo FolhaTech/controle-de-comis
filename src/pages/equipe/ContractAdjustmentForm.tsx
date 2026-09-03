@@ -3,35 +3,59 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export interface ContractAdjustmentFormValues {
   client: string
   case_type: string
   value: number
   start_date: string
+  closed_by: string
 }
 
 interface ContractAdjustmentFormProps {
   initialValues?: Partial<ContractAdjustmentFormValues>
+  // Provided only where the contract isn't already scoped to one consultant
+  // (the Contratos page) — renders a required "Consultor" select and
+  // includes closed_by in the submitted values. Omitted in the per-consultant
+  // Equipe dialog, where the caller already knows which consultant this is.
+  consultantOptions?: string[]
   onSubmit: (values: ContractAdjustmentFormValues) => Promise<void>
   onCancel: () => void
 }
 
-export function ContractAdjustmentForm({ initialValues, onSubmit, onCancel }: ContractAdjustmentFormProps) {
+export function ContractAdjustmentForm({
+  initialValues,
+  consultantOptions,
+  onSubmit,
+  onCancel,
+}: ContractAdjustmentFormProps) {
   const [client, setClient] = useState(initialValues?.client ?? '')
   const [caseType, setCaseType] = useState(initialValues?.case_type ?? '')
   const [value, setValue] = useState(initialValues?.value != null ? String(initialValues.value) : '')
   const [startDate, setStartDate] = useState(initialValues?.start_date ?? '')
+  const [closedBy, setClosedBy] = useState(initialValues?.closed_by ?? '')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const numericValue = Number(value.replace(',', '.'))
-  const isValid = client.trim().length > 0 && Number.isFinite(numericValue) && numericValue >= 0 && startDate.length > 0
+  const isValid =
+    client.trim().length > 0 &&
+    Number.isFinite(numericValue) &&
+    numericValue >= 0 &&
+    startDate.length > 0 &&
+    (!consultantOptions || closedBy.length > 0)
 
   const handleSubmit = async () => {
     if (!isValid) return
     setIsSubmitting(true)
     try {
-      await onSubmit({ client: client.trim(), case_type: caseType.trim(), value: numericValue, start_date: startDate })
+      await onSubmit({
+        client: client.trim(),
+        case_type: caseType.trim(),
+        value: numericValue,
+        start_date: startDate,
+        closed_by: closedBy,
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -39,6 +63,23 @@ export function ContractAdjustmentForm({ initialValues, onSubmit, onCancel }: Co
 
   return (
     <div className="space-y-4">
+      {consultantOptions && (
+        <div className="space-y-1">
+          <Label htmlFor="adj-consultant">Consultor</Label>
+          <Select value={closedBy} onValueChange={setClosedBy}>
+            <SelectTrigger id="adj-consultant">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              {consultantOptions.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="space-y-1">
         <Label htmlFor="adj-client">Cliente</Label>
         <Input id="adj-client" value={client} onChange={(e) => setClient(e.target.value)} placeholder="Nome do cliente" />

@@ -38,7 +38,7 @@ import {
 } from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
 import { format } from 'date-fns'
-import useAppStore from '@/stores/useAppStore'
+import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { ContractAdjustmentForm, type ContractAdjustmentFormValues } from './ContractAdjustmentForm'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -98,8 +98,7 @@ export function ConsultantContractsDialog({
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
-  const { contractAdjustments, addContractAdjustment, updateContractAdjustment, deleteContractAdjustment } =
-    useAppStore()
+  const { isManualContract, saveAdd, saveEdit, removeContract } = useContractRowActions()
   const [formOpen, setFormOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null)
@@ -112,20 +111,6 @@ export function ConsultantContractsDialog({
       setCustomTo('')
     }
   }, [open, initialPeriod, consultant?.id])
-
-  // A contract row backed by an 'add' adjustment is manual end-to-end — edit
-  // and delete act on that adjustment row directly. Any other row is live
-  // CRM data — edit creates/updates an 'edit' override, delete creates a
-  // 'remove' override, both keyed by the contract's id (its processo_id).
-  const addAdjustmentIds = new Set(
-    contractAdjustments.filter((a) => a.action === 'add').map((a) => a.id),
-  )
-  const editAdjustmentByProcessId = new Map(
-    contractAdjustments
-      .filter((a): a is typeof a & { target_processo_id: string } => a.action === 'edit' && !!a.target_processo_id)
-      .map((a) => [a.target_processo_id, a]),
-  )
-  const isManualContract = (c: Contract) => addAdjustmentIds.has(c.id)
 
   const toDateInputValue = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
 
@@ -142,23 +127,9 @@ export function ConsultantContractsDialog({
   const handleFormSubmit = async (values: ContractAdjustmentFormValues) => {
     if (!consultant) return
     if (editingContract) {
-      if (isManualContract(editingContract)) {
-        await updateContractAdjustment(editingContract.id, values)
-      } else {
-        const existingEdit = editAdjustmentByProcessId.get(editingContract.id)
-        if (existingEdit) {
-          await updateContractAdjustment(existingEdit.id, values)
-        } else {
-          await addContractAdjustment({
-            action: 'edit',
-            target_processo_id: editingContract.id,
-            closed_by: consultant.name,
-            ...values,
-          })
-        }
-      }
+      await saveEdit(editingContract, values, consultant.name)
     } else {
-      await addContractAdjustment({ action: 'add', closed_by: consultant.name, ...values })
+      await saveAdd(values, consultant.name)
     }
     setFormOpen(false)
     setEditingContract(null)
@@ -167,15 +138,7 @@ export function ConsultantContractsDialog({
   const handleDeleteConfirm = async () => {
     if (!deleteTarget || !consultant) return
     setIsDeleting(true)
-    if (isManualContract(deleteTarget)) {
-      await deleteContractAdjustment(deleteTarget.id)
-    } else {
-      await addContractAdjustment({
-        action: 'remove',
-        target_processo_id: deleteTarget.id,
-        closed_by: consultant.name,
-      })
-    }
+    await removeContract(deleteTarget, consultant.name)
     setIsDeleting(false)
     setDeleteTarget(null)
   }

@@ -44,7 +44,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
-import { ContractForm } from './contratos/ContractForm'
+import { ContractAdjustmentForm, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
+import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
 import { contractValue as valueOf } from '@/lib/calculations'
 import { useToast } from '@/hooks/use-toast'
@@ -64,8 +65,8 @@ const formatDate = (dateStr: string | null | undefined) => {
 }
 
 export default function Contratos() {
-  const { contracts, contractsLoading, contractsError, filter, deleteContract, fetchContracts } =
-    useAppStore()
+  const { contracts, contractsLoading, contractsError, filter, consultants, fetchContracts } = useAppStore()
+  const { saveAdd, saveEdit, removeContract } = useContractRowActions()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -73,6 +74,8 @@ export default function Contratos() {
   const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
   const [contratoSearchOpen, setContratoSearchOpen] = useState(false)
   const [contratoSearchTerm, setContratoSearchTerm] = useState('')
+
+  const consultantNames = consultants.map((c) => c.name)
 
   useEffect(() => {
     fetchContracts()
@@ -125,8 +128,20 @@ export default function Contratos() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    const { error } = await deleteContract(id)
+  const handleFormSubmit = async (values: ContractAdjustmentFormValues) => {
+    const { error } = editingContract
+      ? await saveEdit(editingContract, values, editingContract.closed_by || '')
+      : await saveAdd(values, '')
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar.' })
+    } else {
+      toast({ title: editingContract ? 'Contrato atualizado' : 'Contrato criado' })
+      setIsDialogOpen(false)
+    }
+  }
+
+  const handleDelete = async (contract: Contract) => {
+    const { error } = await removeContract(contract, contract.closed_by || '')
     if (error) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.' })
     } else {
@@ -264,17 +279,27 @@ export default function Contratos() {
                 <Plus className="mr-2 h-4 w-4" /> Novo Contrato
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[420px]">
               <DialogHeader>
                 <DialogTitle>
                   {editingContract ? 'Editar Contrato' : 'Registrar Novo Contrato'}
                 </DialogTitle>
               </DialogHeader>
-              <ContractForm
-                contract={editingContract}
-                onSuccess={() => {
-                  setIsDialogOpen(false)
-                }}
+              <ContractAdjustmentForm
+                consultantOptions={consultantNames}
+                initialValues={
+                  editingContract
+                    ? {
+                        client: editingContract.client || editingContract.name || '',
+                        case_type: editingContract.case_type || '',
+                        value: valueOf(editingContract),
+                        start_date: editingContract.start_date ? editingContract.start_date.slice(0, 10) : '',
+                        closed_by: editingContract.closed_by || '',
+                      }
+                    : undefined
+                }
+                onSubmit={handleFormSubmit}
+                onCancel={() => setIsDialogOpen(false)}
               />
             </DialogContent>
           </Dialog>
@@ -482,7 +507,7 @@ export default function Contratos() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDelete(contract.id)}
+                              onClick={() => handleDelete(contract)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Excluir

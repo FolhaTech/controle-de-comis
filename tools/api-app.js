@@ -188,12 +188,19 @@ app.put('/api/contract-adjustments/:id', async (req, res) => {
   let conn
   try {
     const { id } = req.params
-    const { client, case_type, value, start_date } = req.body || {}
+    const { client, case_type, value, start_date, closed_by } = req.body || {}
     conn = await getConnection()
-    await conn.execute(
-      `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ? WHERE id = ?`,
-      [client ?? null, case_type ?? null, value ?? null, start_date ?? null, id],
-    )
+    if (closed_by) {
+      await conn.execute(
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, closed_by = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, closed_by, id],
+      )
+    } else {
+      await conn.execute(
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, id],
+      )
+    }
     const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])
     if (!rows.length) return res.status(404).json({ error: 'not found' })
     res.json({ data: rows[0] })

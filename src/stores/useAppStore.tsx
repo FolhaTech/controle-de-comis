@@ -6,12 +6,7 @@ import {
   updateTeamMember,
   deleteTeamMember,
 } from '@/services/team-members'
-import {
-  fetchContracts,
-  createContract,
-  updateContract,
-  deleteContract,
-} from '@/services/contracts'
+import { fetchContracts } from '@/services/contracts'
 import {
   fetchContractAdjustments,
   createContractAdjustment,
@@ -73,9 +68,6 @@ interface AppStoreState {
   fetchConsultants: () => Promise<{ error: unknown }>
   fetchContracts: () => Promise<void>
   fetchActionTypes: () => Promise<void>
-  addContract: (contract: Partial<Contract>) => Promise<{ error: unknown }>
-  updateContract: (id: string, updates: Partial<Contract>) => Promise<{ error: unknown }>
-  deleteContract: (id: string) => Promise<{ error: unknown }>
   addContractAdjustment: (input: ContractAdjustmentInput) => Promise<{ error: unknown }>
   updateContractAdjustment: (id: string, updates: ContractAdjustmentUpdate) => Promise<{ error: unknown }>
   deleteContractAdjustment: (id: string) => Promise<{ error: unknown }>
@@ -139,24 +131,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const initApp = useCallback(async () => {
     await Promise.all([fetchContractsAction(), fetchConsultants(), fetchActionTypesAction()])
   }, [fetchContractsAction, fetchConsultants, fetchActionTypesAction])
-
-  const addContract = useCallback(async (contract: Partial<Contract>) => {
-    const { data, error } = await createContract(contract)
-    if (!error && data) setContracts((prev) => [data, ...prev])
-    return { error }
-  }, [])
-
-  const updateContractRow = useCallback(async (id: string, updates: Partial<Contract>) => {
-    const { data, error } = await updateContract(id, updates)
-    if (!error && data) setContracts((prev) => prev.map((c) => (c.id === id ? data : c)))
-    return { error }
-  }, [])
-
-  const deleteContractRow = useCallback(async (id: string) => {
-    const { error } = await deleteContract(id)
-    if (!error) setContracts((prev) => prev.filter((c) => c.id !== id))
-    return { error }
-  }, [])
 
   // These three mutate the manual add/edit/remove overlay applied on top of
   // the live CRM contracts (see fetchContracts) — after any of them succeed,
@@ -240,9 +214,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchConsultants,
         fetchContracts: fetchContractsAction,
         fetchActionTypes: fetchActionTypesAction,
-        addContract,
-        updateContract: updateContractRow,
-        deleteContract: deleteContractRow,
         addContractAdjustment: addContractAdjustmentAction,
         updateContractAdjustment: updateContractAdjustmentAction,
         deleteContractAdjustment: deleteContractAdjustmentAction,
