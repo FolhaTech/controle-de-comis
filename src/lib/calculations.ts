@@ -1,4 +1,20 @@
-import { Contract, ConsultantDeduction, Settings } from './types'
+import { Consultant, Contract, ConsultantDeduction, Settings } from './types'
+
+// Fallback Ajuda de Custo when a consultant hasn't had fixed_salary filled in
+// via the edit form yet (that field is saved per-browser, so this keeps the
+// known values visible everywhere until someone fills the form for real).
+const DEFAULT_AJUDA_CUSTO: Record<string, number> = {
+  'amanda iagarashi': 1401.19,
+  'camila salles': 1401.19,
+  'kamila marson': 1463.75,
+  'ivani silva': 2479.03,
+  'denise germano': 2000.0,
+}
+
+export function getAjudaCusto(consultant: Consultant): number {
+  if (consultant.fixed_salary) return consultant.fixed_salary
+  return DEFAULT_AJUDA_CUSTO[consultant.name.trim().toLowerCase()] ?? 0
+}
 
 // Value to use everywhere "the contract's value" is shown or summed:
 // valor_desconto_forma_pagamento (net, after payment-method discount),
