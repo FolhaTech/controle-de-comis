@@ -211,11 +211,20 @@ export function PremiacaoReport({
           {personContracts.map((c, idx) => {
             const item = itemsByContractId.get(c.id)
             const isTrabalhista = c.service_type === 'Trabalhista'
+            const isBelowStandardValue = !isTrabalhista && contractValue(c) < 3000
             return (
               <tr key={c.id} style={{ background: idx % 2 === 0 ? '#dddddd' : '#ffffff' }}>
                 <td style={cellStyle('left')}>{c.client || c.name || '—'}</td>
                 <td style={cellStyle('left')}>{c.case_type || c.service_type || '—'}</td>
-                <td style={cellStyle('right')}>{currency(contractValue(c))}</td>
+                <td
+                  style={{
+                    ...cellStyle('right'),
+                    color: isBelowStandardValue ? '#ff0000' : undefined,
+                    fontWeight: isBelowStandardValue ? 'bold' : undefined,
+                  }}
+                >
+                  {currency(contractValue(c))}
+                </td>
                 <td style={cellStyle('right')}>
                   {isTrabalhista ? '—' : item ? `${item.percentage.toFixed(1)}%` : '—'}
                 </td>
