@@ -26,9 +26,9 @@ const MONTH_LABELS = [
   'Dezembro',
 ]
 
-const NAVY = '#1b2a5e'
-const GOLD = '#d3a13a'
-const RED = '#a30015'
+const NAVY = '#192768'
+const GOLD = '#d09829'
+const RED = '#c00000'
 
 interface PremiacaoReportProps {
   consultant: Consultant
@@ -139,7 +139,7 @@ export function PremiacaoReport({
       </div>
 
       {/* Resumo prestação de serviços */}
-      <div style={{ border: `1px solid ${NAVY}`, marginTop: 18 }}>
+      <div style={{ border: '1px solid #000000', marginTop: 18 }}>
         <div style={{ background: NAVY, color: '#fff', padding: '6px 12px', fontWeight: 'bold' }}>
           Resumo prestação de serviços
         </div>
@@ -153,37 +153,37 @@ export function PremiacaoReport({
       </div>
 
       {/* Resumo cancelados */}
-      <div style={{ border: `1px solid ${RED}`, marginTop: 14 }}>
-        <div style={{ background: RED, color: '#fff', padding: '6px 12px', fontWeight: 'bold' }}>
-          Resumo cancelados
-        </div>
-        {cancelledContracts.length === 0 ? (
-          <div style={{ padding: '10px 12px', fontSize: 12, color: '#666' }}>
-            Nenhum cancelamento nesta competência.
-          </div>
-        ) : (
-          cancelledContracts.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 12px',
-                fontSize: 12,
-                borderTop: '1px solid #eee',
-              }}
-            >
-              <span>{c.client || c.name}</span>
-              <span>{currency(contractValue(c))}</span>
+      <div style={{ border: '1px solid #000000', marginTop: 14 }}>
+        <div style={{ background: RED }}>
+          <div style={{ color: '#fff', padding: '6px 12px', fontWeight: 'bold' }}>Resumo cancelados</div>
+          {cancelledContracts.length === 0 ? (
+            <div style={{ padding: '10px 12px', fontSize: 12, color: '#fff' }}>
+              Nenhum cancelamento nesta competência.
             </div>
-          ))
-        )}
+          ) : (
+            cancelledContracts.map((c) => (
+              <div
+                key={c.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '4px 12px',
+                  fontSize: 12,
+                  color: '#fff',
+                }}
+              >
+                <span>{c.client || c.name}</span>
+                <span>{currency(contractValue(c))}</span>
+              </div>
+            ))
+          )}
+        </div>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            background: RED,
-            color: '#fff',
+            background: '#fff',
+            color: RED,
             padding: '6px 12px',
             fontWeight: 'bold',
           }}
@@ -212,7 +212,7 @@ export function PremiacaoReport({
             const item = itemsByContractId.get(c.id)
             const isTrabalhista = c.service_type === 'Trabalhista'
             return (
-              <tr key={c.id} style={{ background: idx % 2 === 0 ? '#f2f2f2' : '#ffffff' }}>
+              <tr key={c.id} style={{ background: idx % 2 === 0 ? '#dddddd' : '#ffffff' }}>
                 <td style={cellStyle('left')}>{c.client || c.name || '—'}</td>
                 <td style={cellStyle('left')}>{c.case_type || c.service_type || '—'}</td>
                 <td style={cellStyle('right')}>{currency(contractValue(c))}</td>
