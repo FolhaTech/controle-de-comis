@@ -94,3 +94,27 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+/* Printing a Premiação report: hide the whole app and show only the
+   printable container that's mounted while a print job is in progress
+   (see PremiacaoPrintView / useEquipePrinting). Using visibility instead
+   of display keeps the rest of the app's layout intact once printing ends. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #premiacao-print-root,
+  #premiacao-print-root * {
+    visibility: visible;
+  }
+  #premiacao-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  @page {
+    size: A4;
+    margin: 16px;
+  }
+}

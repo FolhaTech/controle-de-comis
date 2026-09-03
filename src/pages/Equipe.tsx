@@ -43,7 +43,7 @@ import {
 import { ConsultantDeductionsDialog } from './equipe/ConsultantDeductionsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
-import { generatePremiacaoPdf } from './equipe/premiacaoPdf'
+import { PremiacaoReport } from './equipe/premiacaoPdf'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -120,8 +120,23 @@ export default function Equipe() {
   const [viewingPeriod, setViewingPeriod] = useState<ContractsPeriod>('all')
   const [viewingDeductionsFor, setViewingDeductionsFor] = useState<Consultant | null>(null)
   const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
-  const [isExportingPdfs, setIsExportingPdfs] = useState(false)
+  const [printTargets, setPrintTargets] = useState<Consultant[] | null>(null)
   const { toast } = useToast()
+
+  // Print the mounted #premiacao-print-root (see main.css) once its content
+  // has actually painted, then clear it once the browser's print dialog
+  // closes — whether the user saved a PDF or cancelled.
+  useEffect(() => {
+    if (!printTargets) return
+    const timer = setTimeout(() => window.print(), 80)
+    return () => clearTimeout(timer)
+  }, [printTargets])
+
+  useEffect(() => {
+    const handleAfterPrint = () => setPrintTargets(null)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => window.removeEventListener('afterprint', handleAfterPrint)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -167,27 +182,11 @@ export default function Equipe() {
     setDeleteTarget(null)
   }
 
-  const handleExportPdfs = async () => {
+  const handlePrintOne = (consultant: Consultant) => setPrintTargets([consultant])
+
+  const handlePrintAll = () => {
     if (consultants.length === 0) return
-    setIsExportingPdfs(true)
-    try {
-      for (const consultant of consultants) {
-        await generatePremiacaoPdf(consultant, contracts, consultantDeductions, settings, filter.month, filter.year)
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      }
-      toast({
-        title: 'PDFs gerados',
-        description: `${consultants.length} PDF(s) baixados para ${MONTHS[filter.month - 1]}/${filter.year}.`,
-      })
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao gerar PDFs',
-        description: 'Não foi possível gerar um ou mais PDFs.',
-      })
-    } finally {
-      setIsExportingPdfs(false)
-    }
+    setPrintTargets(consultants)
   }
 
   return (
@@ -201,13 +200,11 @@ export default function Equipe() {
           <Button
             variant="outline"
             className="w-full sm:w-auto"
-            onClick={handleExportPdfs}
-            disabled={isExportingPdfs || consultantsLoading || consultants.length === 0}
+            onClick={handlePrintAll}
+            disabled={consultantsLoading || consultants.length === 0}
           >
             <FileDown className="mr-2 h-4 w-4" />
-            {isExportingPdfs
-              ? 'Gerando PDFs...'
-              : `Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
+            {`Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -401,6 +398,15 @@ export default function Equipe() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
+                          title="Extrair PDF"
+                          onClick={() => handlePrintOne(consultant)}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
                           title="Descontos"
                           onClick={() => setViewingDeductionsFor(consultant)}
                         >
@@ -524,6 +530,26 @@ export default function Equipe() {
           if (!open) setViewingDeductionsFor(null)
         }}
       />
+
+      {/* Only visible while printing (see the @media print rule in main.css) —
+          holds one or several Premiação reports for window.print() to turn
+          into a PDF via the browser's own "Salvar como PDF" print target. */}
+      {printTargets && (
+        <div id="premiacao-print-root">
+          {printTargets.map((consultant, index) => (
+            <PremiacaoReport
+              key={consultant.id}
+              consultant={consultant}
+              contracts={contracts}
+              consultantDeductions={consultantDeductions}
+              settings={settings}
+              month={filter.month}
+              year={filter.year}
+              pageBreakAfter={index < printTargets.length - 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

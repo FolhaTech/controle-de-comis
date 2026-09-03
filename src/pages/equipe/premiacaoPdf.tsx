@@ -1,6 +1,3 @@
-import { createRoot } from 'react-dom/client'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 import {
   calculateAttendantCommission,
   calculateCommissionBreakdown,
@@ -33,23 +30,33 @@ const NAVY = '#1b2a5e'
 const GOLD = '#d3a13a'
 const RED = '#a30015'
 
-interface PremiacaoTemplateProps {
+interface PremiacaoReportProps {
   consultant: Consultant
   contracts: Contract[]
   consultantDeductions: ConsultantDeduction[]
   settings: Settings
   month: number
   year: number
+  // Set on every report but the last when printing several consultants in
+  // one job (see the Equipe page's "Extrair PDFs" bulk action), so each
+  // consultant starts on a fresh printed page.
+  pageBreakAfter?: boolean
 }
 
-function PremiacaoTemplate({
+// Renders one consultant's Premiação report, styled to match the firm's
+// official template. Mounted into #premiacao-print-root and printed via
+// window.print() — see useEquipePrinting in Equipe.tsx. Kept print-only
+// (no more jsPDF/html2canvas): browser print-to-PDF gives sharp vector
+// text and a far smaller file than a rasterized canvas ever could.
+export function PremiacaoReport({
   consultant,
   contracts,
   consultantDeductions,
   settings,
   month,
   year,
-}: PremiacaoTemplateProps) {
+  pageBreakAfter = false,
+}: PremiacaoReportProps) {
   const now = new Date()
   const normalize = (v: string) => v.trim().toLowerCase()
   const target = normalize(consultant.name)
@@ -85,23 +92,32 @@ function PremiacaoTemplate({
   // "Poderia ter chegado aqui": what this month's premiação would be one
   // commission tier up — a motivational look at the value of a few more
   // contracts, not a literal projection tied to any specific real client.
-  const nonTrabalhistaCount = validContracts.filter((c) => c.service_type !== 'Trabalhista').length
+  // Trabalhista is flat-rate per contract, not tier-based on value, so it
+  // never has a "next tier" upside — only the non-Trabalhista slice does.
+  const nonTrabalhistaValid = validContracts.filter((c) => c.service_type !== 'Trabalhista')
+  const nonTrabalhistaValue = nonTrabalhistaValid.reduce((sum, c) => sum + contractValue(c), 0)
   const nextTier = settings.tiers
-    .filter((t) => t.min > nonTrabalhistaCount)
+    .filter((t) => t.min > nonTrabalhistaValid.length)
     .sort((a, b) => a.min - b.min)[0]
-  const poderiaTerChegado = nextTier
-    ? validTotalValue * (nextTier.percentage / 100) + trabalhista.commissionValue + ajudaCusto - canceladosTotal - desconto
-    : totalNotaFiscal
+  const poderiaTerChegado =
+    nonTrabalhistaValid.length === 0
+      ? totalNotaFiscal
+      : nextTier
+        ? nonTrabalhistaValue * (nextTier.percentage / 100) + trabalhista.commissionValue + ajudaCusto - canceladosTotal - desconto
+        : totalNotaFiscal
 
   const itemsByContractId = new Map(breakdown.items.map((i) => [i.contract.id, i]))
 
   return (
     <div
       style={{
-        width: 780,
+        width: '100%',
+        maxWidth: 760,
         background: '#ffffff',
         fontFamily: 'Georgia, "Times New Roman", serif',
         color: '#1a1a1a',
+        breakAfter: pageBreakAfter ? 'page' : 'auto',
+        padding: '0 0 24px',
       }}
     >
       {/* Header */}
@@ -404,76 +420,3 @@ function SummaryRow({
   )
 }
 
-export async function generatePremiacaoPdf(
-  consultant: Consultant,
-  contracts: Contract[],
-  consultantDeductions: ConsultantDeduction[],
-  settings: Settings,
-  month: number,
-  year: number,
-) {
-  const container = document.createElement('div')
-  container.style.position = 'fixed'
-  container.style.left = '-99999px'
-  container.style.top = '0'
-  document.body.appendChild(container)
-
-  const root = createRoot(container)
-  await new Promise<void>((resolve) => {
-    root.render(
-      <PremiacaoTemplate
-        consultant={consultant}
-        contracts={contracts}
-        consultantDeductions={consultantDeductions}
-        settings={settings}
-        month={month}
-        year={year}
-      />,
-    )
-    setTimeout(resolve, 50)
-  })
-
-  try {
-    const target = container.firstElementChild as HTMLElement
-    const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#ffffff' })
-
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const pageHeightPx = Math.floor((pageHeight * canvas.width) / pageWidth)
-
-    let renderedPx = 0
-    let pageIndex = 0
-    while (renderedPx < canvas.height) {
-      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx)
-      const pageCanvas = document.createElement('canvas')
-      pageCanvas.width = canvas.width
-      pageCanvas.height = sliceHeightPx
-      const ctx = pageCanvas.getContext('2d')!
-      ctx.drawImage(
-        canvas,
-        0,
-        renderedPx,
-        canvas.width,
-        sliceHeightPx,
-        0,
-        0,
-        canvas.width,
-        sliceHeightPx,
-      )
-      const sliceHeightPt = (sliceHeightPx * pageWidth) / canvas.width
-
-      if (pageIndex > 0) pdf.addPage()
-      pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, sliceHeightPt)
-
-      renderedPx += sliceHeightPx
-      pageIndex++
-    }
-
-    const monthLabel = String(month).padStart(2, '0')
-    pdf.save(`Premiacao_${consultant.name.replace(/\s+/g, '_')}_${monthLabel}-${year}.pdf`)
-  } finally {
-    root.unmount()
-    document.body.removeChild(container)
-  }
-}
