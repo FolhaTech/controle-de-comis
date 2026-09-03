@@ -82,6 +82,16 @@ app.get('/api/inserrido-pgto', async (req, res) => {
 //   - T3.acao_cli (the real practice-area/case-type label) — lets the UI show
 //     why the same client/CPF can legitimately appear more than once (two
 //     separate matters), instead of looking like a duplicate.
+//   - A third OR-branch beyond the view's own 05.1/11 restriction: the
+//     internal pré-processual/financeiro teams have until day 4/5 of the
+//     following month to push a case through to 05.1, and the firm's own
+//     closing run doesn't happen until day 6 — so a case already confirmed
+//     paid (data_pgto_cliente set) that has progressed past the early
+//     intake stages (04, 05, 07, 08.5, or 10 - Pré-Processual) is real,
+//     just administratively behind. '15 - Cancelamento contrato' is also
+//     fetched (with no value/date requirement) so src/services/contracts.ts
+//     can exclude a processo_id entirely if it was ever cancelled, even if
+//     an earlier touch had already reached one of those later stages.
 const FORMAS_PAGAMENTOS_QUERY = `
   SELECT DISTINCT T2.processo_id AS processo_id, T1.dat_abertura AS Data_Abertura, T2.dat_criacao AS Data_Criacao,
          T2.dat_limite AS Data_Limite, T2.dat_execucao AS Data_Execucao,
@@ -101,6 +111,9 @@ const FORMAS_PAGAMENTOS_QUERY = `
   LEFT JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T3.id = T4.cad_clientes_id
   WHERE (T2.nom_tarefa = '05.1 - Financeiro link Pgto' AND T4.valor_pagto IS NOT NULL)
      OR T2.nom_tarefa = '11 - Confecção inicial'
+     OR (T2.nom_tarefa IN ('04 - Baixa em Sistema', '05 - Validação do Pagamento', '07 - Solicitação/Validação de documentos', '08.5 - Atendimento por consultora', '10  - Pre-Processual')
+         AND T4.valor_pagto IS NOT NULL AND T3.data_pgto_cliente IS NOT NULL)
+     OR T2.nom_tarefa = '15 - Cancelamento contrato'
 `
 
 app.get('/api/vw_formas_pagamentos', async (req, res) => {

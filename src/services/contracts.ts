@@ -183,27 +183,49 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
         // trabalhista intake row for that same client name should be ignored.
         const TASK_FINANCEIRO = '05.1 - Financeiro link Pgto'
         const TASK_TRABALHISTA = '11 - Confecção inicial'
+        const TASK_CANCELADO = '15 - Cancelamento contrato'
+        // Pré-processual/financeiro have until day 4/5 of the following month
+        // to push a confirmed-paid case (data_pgto_cliente already set) through
+        // to 05.1, and the firm's own closing only runs day 6 — so a case that
+        // has progressed past early intake (01-03) to any of these stages is
+        // real, just administratively behind, not a false positive like the
+        // ones caught earlier via data_entrada_pgto (Rayane/Luana/José Antonio).
+        const LATE_STAGE_TASKS = new Set<string>([
+          '04 - Baixa em Sistema',
+          '05 - Validação do Pagamento',
+          '07 - Solicitação/Validação de documentos',
+          '08.5 - Atendimento por consultora',
+          '10  - Pre-Processual',
+        ])
         const namesWithFinanceiro = new Set<string>()
+        const cancelledProcessIds = new Set<string>()
         for (const r of rows) {
           if (r.nom_tarefa === TASK_FINANCEIRO && typeof r.Cliente === 'string' && r.Cliente.trim()) {
             namesWithFinanceiro.add(r.Cliente.trim().toLowerCase())
+          }
+          if (r.nom_tarefa === TASK_CANCELADO) {
+            const processId = String(r.processo_id ?? r.id ?? '')
+            if (processId) cancelledProcessIds.add(processId)
           }
         }
 
         // The API can list the same processo_id more than once — one row per
         // workflow step touch, now including clients who've paid but whose
         // process hasn't reached Financeiro/Trabalhista yet. Prefer, in order:
-        // the Financeiro row, then the Trabalhista row, then whichever copy
-        // has an actual valor_pagto over a 0/empty one.
+        // the Financeiro row, then the Trabalhista row, then a late-stage
+        // touch (see LATE_STAGE_TASKS), then whichever copy has an actual
+        // valor_pagto over a 0/empty one.
         const taskPriority = (task: unknown) => {
-          if (task === TASK_FINANCEIRO) return 2
-          if (task === TASK_TRABALHISTA) return 1
+          if (task === TASK_FINANCEIRO) return 3
+          if (task === TASK_TRABALHISTA) return 2
+          if (typeof task === 'string' && LATE_STAGE_TASKS.has(task)) return 1
           return 0
         }
         const bestRowByProcessId = new Map<string, Record<string, any>>()
         for (const r of rows) {
           const processId = String(r.processo_id ?? r.id ?? '')
           if (!processId) continue
+          if (cancelledProcessIds.has(processId)) continue
           const existing = bestRowByProcessId.get(processId)
           if (!existing) {
             bestRowByProcessId.set(processId, r)
