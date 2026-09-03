@@ -83,6 +83,23 @@ export interface ContractAdjustment {
   updated_at: string | null
 }
 
+// A manual, possibly-installment deduction (advance, loan, equipment...)
+// subtracted from a consultant's "Remuneração + Ajuda de Custo" in Equipe
+// over `installments` consecutive months starting at start_month/start_year.
+// Keyed by consultant_name — consultants aren't server-persisted, so there's
+// no stable id to key against (see services/team-members.ts).
+export interface ConsultantDeduction {
+  id: string
+  consultant_name: string
+  description: string | null
+  total_value: number
+  installments: number
+  start_month: number
+  start_year: number
+  created_at: string | null
+  updated_at: string | null
+}
+
 export interface Settings {
   goals: {
     individualContracts: number

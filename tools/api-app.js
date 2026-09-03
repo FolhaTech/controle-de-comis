@@ -227,6 +227,89 @@ app.delete('/api/contract-adjustments/:id', async (req, res) => {
   }
 })
 
+// Manual, possibly-installment deductions (advances, loans, equipment...)
+// applied against a consultant's "Remuneração + Ajuda de Custo" in Equipe —
+// kept in our own table since consultants themselves aren't server-persisted
+// (they're seeded per-browser from nome_solicitante, see /api/inserrido-pgto).
+// Keyed by consultant_name rather than any consultant id for that reason.
+app.get('/api/consultant-deductions', async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    const [rows] = await conn.execute(`SELECT * FROM consultant_deductions ORDER BY created_at DESC`)
+    res.json({ data: rows })
+  } catch (err) {
+    console.error('GET /api/consultant-deductions error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.post('/api/consultant-deductions', async (req, res) => {
+  let conn
+  try {
+    const { consultant_name, description, total_value, installments, start_month, start_year } = req.body || {}
+    if (!consultant_name) {
+      return res.status(400).json({ error: 'consultant_name is required' })
+    }
+    if (total_value == null || !start_month || !start_year) {
+      return res.status(400).json({ error: 'total_value, start_month and start_year are required' })
+    }
+
+    const id = req.body?.id || crypto.randomUUID()
+    conn = await getConnection()
+    await conn.execute(
+      `INSERT INTO consultant_deductions (id, consultant_name, description, total_value, installments, start_month, start_year, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [id, consultant_name, description ?? null, total_value, installments ?? 1, start_month, start_year],
+    )
+    const [rows] = await conn.execute(`SELECT * FROM consultant_deductions WHERE id = ?`, [id])
+    res.status(201).json({ data: rows[0] ?? null })
+  } catch (err) {
+    console.error('POST /api/consultant-deductions error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.put('/api/consultant-deductions/:id', async (req, res) => {
+  let conn
+  try {
+    const { id } = req.params
+    const { description, total_value, installments, start_month, start_year } = req.body || {}
+    conn = await getConnection()
+    await conn.execute(
+      `UPDATE consultant_deductions SET description = ?, total_value = ?, installments = ?, start_month = ?, start_year = ? WHERE id = ?`,
+      [description ?? null, total_value ?? null, installments ?? 1, start_month ?? null, start_year ?? null, id],
+    )
+    const [rows] = await conn.execute(`SELECT * FROM consultant_deductions WHERE id = ?`, [id])
+    if (!rows.length) return res.status(404).json({ error: 'not found' })
+    res.json({ data: rows[0] })
+  } catch (err) {
+    console.error('PUT /api/consultant-deductions/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.delete('/api/consultant-deductions/:id', async (req, res) => {
+  let conn
+  try {
+    const { id } = req.params
+    conn = await getConnection()
+    await conn.execute(`DELETE FROM consultant_deductions WHERE id = ?`, [id])
+    res.json({ error: null })
+  } catch (err) {
+    console.error('DELETE /api/consultant-deductions/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
 const DOC_COLUMNS = [
   're_pre_prpocessual',
   'compro_end_pre_pro',

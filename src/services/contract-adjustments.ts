@@ -1,29 +1,5 @@
 import type { ContractAdjustment } from '@/lib/types'
-
-function apiBases(): string[] {
-  const bases = [
-    (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
-    'http://localhost:4000',
-    'http://localhost:4001',
-    'http://localhost:4002',
-  ].filter(Boolean) as string[]
-  bases.push('') // same-origin fallback, e.g. Vercel's /api/*
-  return bases
-}
-
-async function tryEachBase<T>(path: string, init: RequestInit | undefined, parse: (res: Response) => Promise<T>): Promise<T> {
-  let lastError: unknown
-  for (const API_BASE of apiBases()) {
-    try {
-      const res = await fetch(`${API_BASE}${path}`, init)
-      if (!res.ok) throw new Error(`API error ${res.status}`)
-      return await parse(res)
-    } catch (error) {
-      lastError = error
-    }
-  }
-  throw lastError ?? new Error('API unavailable')
-}
+import { tryEachBase } from './api-client'
 
 export async function fetchContractAdjustments(): Promise<{ data: ContractAdjustment[] | null; error: any }> {
   try {

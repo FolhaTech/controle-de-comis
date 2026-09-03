@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Users, AlertCircle, FileDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, AlertCircle, FileDown, Wallet } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
-import { calculatePersonMonthlyCommission } from '@/lib/calculations'
+import { calculatePersonMonthlyCommission, calculateMonthlyDeduction } from '@/lib/calculations'
 import { ConsultantForm } from './equipe/ConsultantForm'
 import { MonthlyValuesTable } from './equipe/MonthlyValuesTable'
 import { CommissionMonthlyTable } from './equipe/CommissionMonthlyTable'
@@ -40,6 +40,7 @@ import {
   ConsultantContractsDialog,
   type ContractsPeriod,
 } from './equipe/ConsultantContractsDialog'
+import { ConsultantDeductionsDialog } from './equipe/ConsultantDeductionsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 import { generatePremiacaoPdf } from './equipe/premiacaoPdf'
@@ -123,6 +124,7 @@ export default function Equipe() {
     deleteConsultant,
     contracts,
     contractsLoading,
+    consultantDeductions,
     settings,
     filter,
   } = useAppStore()
@@ -132,6 +134,7 @@ export default function Equipe() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [viewingContractsFor, setViewingContractsFor] = useState<Consultant | null>(null)
   const [viewingPeriod, setViewingPeriod] = useState<ContractsPeriod>('all')
+  const [viewingDeductionsFor, setViewingDeductionsFor] = useState<Consultant | null>(null)
   const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
   const [isExportingPdfs, setIsExportingPdfs] = useState(false)
   const { toast } = useToast()
@@ -329,6 +332,14 @@ export default function Equipe() {
                   filter.year,
                   settings,
                 ).total
+                const monthlyDeduction = calculateMonthlyDeduction(
+                  consultantDeductions,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                )
+                const remuneracaoComAjuda =
+                  remuneracao + getAjudaCusto(consultant) - monthlyDeduction
                 return (
                   <TableRow key={consultant.id} className="hover:bg-secondary/20 transition-colors">
                     <TableCell className="font-medium">{consultant.name}</TableCell>
@@ -358,7 +369,12 @@ export default function Equipe() {
                       {currencyFormatter.format(remuneracao)}
                     </TableCell>
                     <TableCell className="text-sm font-medium">
-                      {currencyFormatter.format(remuneracao + getAjudaCusto(consultant))}
+                      {currencyFormatter.format(remuneracaoComAjuda)}
+                      {monthlyDeduction > 0 && (
+                        <span className="block text-[10px] font-normal text-destructive">
+                          -{currencyFormatter.format(monthlyDeduction)} desconto
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.phone || '—'}
@@ -397,6 +413,15 @@ export default function Equipe() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Descontos"
+                          onClick={() => setViewingDeductionsFor(consultant)}
+                        >
+                          <Wallet className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -505,6 +530,15 @@ export default function Equipe() {
         }}
         initialPeriod={viewingPeriod}
         year={filter.year}
+      />
+
+      <ConsultantDeductionsDialog
+        consultant={viewingDeductionsFor}
+        deductions={consultantDeductions}
+        open={!!viewingDeductionsFor}
+        onOpenChange={(open) => {
+          if (!open) setViewingDeductionsFor(null)
+        }}
       />
     </div>
   )

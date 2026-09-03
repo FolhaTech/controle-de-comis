@@ -1,4 +1,4 @@
-import { Contract, Settings } from './types'
+import { Contract, ConsultantDeduction, Settings } from './types'
 
 // Value to use everywhere "the contract's value" is shown or summed:
 // valor_desconto_forma_pagamento (net, after payment-method discount),
@@ -218,6 +218,30 @@ export function calculatePersonMonthlyCommission(
     trabalhistaCommissionValue: trabalhista.commissionValue,
     total: breakdown.total + trabalhista.commissionValue,
   }
+}
+
+// Sum of the monthly installment of every deduction (advance, loan,
+// equipment...) active for `personName` in `month`/`year`. A deduction of
+// total_value split into `installments` starting at start_month/start_year
+// contributes total_value/installments to each of those consecutive months;
+// installments defaults to 1, so an unparcelled deduction is just applied
+// once in its start month.
+export function calculateMonthlyDeduction(
+  deductions: ConsultantDeduction[],
+  personName: string,
+  month: number,
+  year: number,
+): number {
+  const normalize = (v: string) => v.trim().toLowerCase()
+  const target = normalize(personName)
+  return deductions
+    .filter((d) => normalize(d.consultant_name) === target)
+    .reduce((sum, d) => {
+      const installmentIndex = (year - d.start_year) * 12 + (month - d.start_month)
+      const installments = d.installments > 0 ? d.installments : 1
+      if (installmentIndex < 0 || installmentIndex >= installments) return sum
+      return sum + d.total_value / installments
+    }, 0)
 }
 
 // Isolates just the Trabalhista slice of a person's monthly commission — a

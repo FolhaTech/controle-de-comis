@@ -1,5 +1,13 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { Contract, Consultant, Settings, FilterContext, ActionType, ContractAdjustment } from '@/lib/types'
+import {
+  Contract,
+  Consultant,
+  Settings,
+  FilterContext,
+  ActionType,
+  ContractAdjustment,
+  ConsultantDeduction,
+} from '@/lib/types'
 import {
   fetchTeamMembers,
   createTeamMember,
@@ -15,6 +23,14 @@ import {
   type ContractAdjustmentInput,
   type ContractAdjustmentUpdate,
 } from '@/services/contract-adjustments'
+import {
+  fetchConsultantDeductions,
+  createConsultantDeduction,
+  updateConsultantDeduction,
+  deleteConsultantDeduction,
+  type ConsultantDeductionInput,
+  type ConsultantDeductionUpdate,
+} from '@/services/consultant-deductions'
 import { fetchActionTypes, createActionType } from '@/services/action-types'
 
 const defaultSettings: Settings = {
@@ -60,6 +76,7 @@ interface AppStoreState {
   contractAdjustments: ContractAdjustment[]
   consultants: Consultant[]
   consultantsLoading: boolean
+  consultantDeductions: ConsultantDeduction[]
   actionTypes: ActionType[]
   actionTypesLoading: boolean
   settings: Settings
@@ -71,6 +88,9 @@ interface AppStoreState {
   addContractAdjustment: (input: ContractAdjustmentInput) => Promise<{ error: unknown }>
   updateContractAdjustment: (id: string, updates: ContractAdjustmentUpdate) => Promise<{ error: unknown }>
   deleteContractAdjustment: (id: string) => Promise<{ error: unknown }>
+  addConsultantDeduction: (input: ConsultantDeductionInput) => Promise<{ error: unknown }>
+  updateConsultantDeduction: (id: string, updates: ConsultantDeductionUpdate) => Promise<{ error: unknown }>
+  deleteConsultantDeduction: (id: string) => Promise<{ error: unknown }>
   addConsultant: (member: Partial<Consultant>) => Promise<{ error: unknown }>
   updateConsultant: (id: string, updates: Partial<Consultant>) => Promise<{ error: unknown }>
   deleteConsultant: (id: string) => Promise<{ error: unknown }>
@@ -90,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [contractAdjustments, setContractAdjustments] = useState<ContractAdjustment[]>([])
   const [consultants, setConsultants] = useState<Consultant[]>([])
   const [consultantsLoading, setConsultantsLoading] = useState(false)
+  const [consultantDeductions, setConsultantDeductions] = useState<ConsultantDeduction[]>([])
   const [actionTypes, setActionTypes] = useState<ActionType[]>([])
   const [actionTypesLoading, setActionTypesLoading] = useState(false)
   const [settings, setSettings] = useState<Settings>(defaultSettings)
@@ -100,8 +121,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchConsultants = useCallback(async () => {
     setConsultantsLoading(true)
-    const { data, error } = await fetchTeamMembers()
+    const [{ data, error }, { data: deductions }] = await Promise.all([
+      fetchTeamMembers(),
+      fetchConsultantDeductions(),
+    ])
     if (!error && data) setConsultants(data)
+    if (deductions) setConsultantDeductions(deductions)
     setConsultantsLoading(false)
     return { error }
   }, [])
@@ -152,6 +177,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!error) await fetchContractsAction()
     return { error }
   }, [fetchContractsAction])
+
+  // Same shape as the contract adjustment actions above — refetch after any
+  // mutation so "Remuneração + Ajuda de Custo" reflects the change right away.
+  const addConsultantDeductionAction = useCallback(async (input: ConsultantDeductionInput) => {
+    const { error } = await createConsultantDeduction(input)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
+
+  const updateConsultantDeductionAction = useCallback(async (id: string, updates: ConsultantDeductionUpdate) => {
+    const { error } = await updateConsultantDeduction(id, updates)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
+
+  const deleteConsultantDeductionAction = useCallback(async (id: string) => {
+    const { error } = await deleteConsultantDeduction(id)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
 
   const addConsultant = useCallback(async (member: Partial<Consultant>) => {
     const { data, error } = await createTeamMember(member)
@@ -206,6 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         contractAdjustments,
         consultants,
         consultantsLoading,
+        consultantDeductions,
         actionTypes,
         actionTypesLoading,
         settings,
@@ -217,6 +263,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addContractAdjustment: addContractAdjustmentAction,
         updateContractAdjustment: updateContractAdjustmentAction,
         deleteContractAdjustment: deleteContractAdjustmentAction,
+        addConsultantDeduction: addConsultantDeductionAction,
+        updateConsultantDeduction: updateConsultantDeductionAction,
+        deleteConsultantDeduction: deleteConsultantDeductionAction,
         addConsultant,
         updateConsultant,
         deleteConsultant,
