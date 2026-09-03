@@ -5,6 +5,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Table,
@@ -15,9 +25,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import {
   isContractValid,
   calculateCommissionBreakdown,
@@ -26,6 +38,8 @@ import {
 } from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
 import { format } from 'date-fns'
+import useAppStore from '@/stores/useAppStore'
+import { ContractAdjustmentForm, type ContractAdjustmentFormValues } from './ContractAdjustmentForm'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -84,6 +98,13 @@ export function ConsultantContractsDialog({
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
+  const { contractAdjustments, addContractAdjustment, updateContractAdjustment, deleteContractAdjustment } =
+    useAppStore()
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   useEffect(() => {
     if (open) {
       setPeriod(initialPeriod)
@@ -91,6 +112,73 @@ export function ConsultantContractsDialog({
       setCustomTo('')
     }
   }, [open, initialPeriod, consultant?.id])
+
+  // A contract row backed by an 'add' adjustment is manual end-to-end — edit
+  // and delete act on that adjustment row directly. Any other row is live
+  // CRM data — edit creates/updates an 'edit' override, delete creates a
+  // 'remove' override, both keyed by the contract's id (its processo_id).
+  const addAdjustmentIds = new Set(
+    contractAdjustments.filter((a) => a.action === 'add').map((a) => a.id),
+  )
+  const editAdjustmentByProcessId = new Map(
+    contractAdjustments
+      .filter((a): a is typeof a & { target_processo_id: string } => a.action === 'edit' && !!a.target_processo_id)
+      .map((a) => [a.target_processo_id, a]),
+  )
+  const isManualContract = (c: Contract) => addAdjustmentIds.has(c.id)
+
+  const toDateInputValue = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
+
+  const handleOpenAdd = () => {
+    setEditingContract(null)
+    setFormOpen(true)
+  }
+
+  const handleOpenEdit = (c: Contract) => {
+    setEditingContract(c)
+    setFormOpen(true)
+  }
+
+  const handleFormSubmit = async (values: ContractAdjustmentFormValues) => {
+    if (!consultant) return
+    if (editingContract) {
+      if (isManualContract(editingContract)) {
+        await updateContractAdjustment(editingContract.id, values)
+      } else {
+        const existingEdit = editAdjustmentByProcessId.get(editingContract.id)
+        if (existingEdit) {
+          await updateContractAdjustment(existingEdit.id, values)
+        } else {
+          await addContractAdjustment({
+            action: 'edit',
+            target_processo_id: editingContract.id,
+            closed_by: consultant.name,
+            ...values,
+          })
+        }
+      }
+    } else {
+      await addContractAdjustment({ action: 'add', closed_by: consultant.name, ...values })
+    }
+    setFormOpen(false)
+    setEditingContract(null)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget || !consultant) return
+    setIsDeleting(true)
+    if (isManualContract(deleteTarget)) {
+      await deleteContractAdjustment(deleteTarget.id)
+    } else {
+      await addContractAdjustment({
+        action: 'remove',
+        target_processo_id: deleteTarget.id,
+        closed_by: consultant.name,
+      })
+    }
+    setIsDeleting(false)
+    setDeleteTarget(null)
+  }
 
   const normalize = (value: string) => value.trim().toLowerCase()
   const target = consultant ? normalize(consultant.name) : ''
@@ -129,6 +217,7 @@ export function ConsultantContractsDialog({
   const totalAReceber = breakdown.total + trabalhista.commissionValue
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden">
         <DialogHeader>
@@ -156,20 +245,26 @@ export function ConsultantContractsDialog({
                 </strong>
               </span>
             </div>
-            <Select value={period} onValueChange={(v) => setPeriod(v as ContractsPeriod)}>
-              <SelectTrigger className="h-8 w-[170px] text-xs">
-                <SelectValue placeholder="Competência" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os períodos</SelectItem>
-                {MONTHS.map((m, i) => (
-                  <SelectItem key={i} value={`${i + 1}-${year}`}>
-                    {m}/{year}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Período personalizado</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleOpenAdd}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Adicionar contrato
+              </Button>
+              <Select value={period} onValueChange={(v) => setPeriod(v as ContractsPeriod)}>
+                <SelectTrigger className="h-8 w-[170px] text-xs">
+                  <SelectValue placeholder="Competência" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i} value={`${i + 1}-${year}`}>
+                      {m}/{year}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Período personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {period === 'custom' && (
@@ -213,12 +308,13 @@ export function ConsultantContractsDialog({
                 <TableHead className="text-right">Comissão</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {personContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {period === 'custom' && !customFrom && !customTo
                       ? 'Selecione a data inicial e/ou final.'
                       : 'Nenhum contrato encontrado para esta competência.'}
@@ -256,6 +352,24 @@ export function ConsultantContractsDialog({
                             {c.status || '—'}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleOpenEdit(c)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(c)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     )
                   })}
@@ -264,7 +378,7 @@ export function ConsultantContractsDialog({
                     <TableCell className="text-right whitespace-nowrap text-primary">
                       {currencyFormatter.format(totalAReceber)}
                     </TableCell>
-                    <TableCell colSpan={2} />
+                    <TableCell colSpan={3} />
                   </TableRow>
                 </>
               )}
@@ -273,5 +387,54 @@ export function ConsultantContractsDialog({
         </ScrollArea>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={formOpen} onOpenChange={(o) => { setFormOpen(o); if (!o) setEditingContract(null) }}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>{editingContract ? 'Editar contrato' : 'Adicionar contrato'}</DialogTitle>
+        </DialogHeader>
+        <ContractAdjustmentForm
+          initialValues={
+            editingContract
+              ? {
+                  client: editingContract.client || editingContract.name || '',
+                  case_type: editingContract.case_type || '',
+                  value: valueOf(editingContract),
+                  start_date: toDateInputValue(editingContract.start_date),
+                }
+              : undefined
+          }
+          onSubmit={handleFormSubmit}
+          onCancel={() => { setFormOpen(false); setEditingContract(null) }}
+        />
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remover contrato</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja remover o contrato de{' '}
+            <strong>{deleteTarget?.client || deleteTarget?.name}</strong> da apuração de{' '}
+            {consultant?.name}? Esta ação não afeta o cadastro original no Triare.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault()
+              handleDeleteConfirm()
+            }}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? 'Removendo...' : 'Remover'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

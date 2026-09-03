@@ -134,6 +134,92 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
   }
 })
 
+// Manual corrections to the live CRM-derived contract list (add a contract
+// not tracked by the CRM workflow, override a field on one that is, or
+// exclude one entirely) — kept in our own table since we don't write back
+// into the CRM's tables. Applied on top of FORMAS_PAGAMENTOS_QUERY's output
+// by fetchContracts() in src/services/contracts.ts.
+app.get('/api/contract-adjustments', async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    const [rows] = await conn.execute(`SELECT * FROM contract_adjustments ORDER BY created_at DESC`)
+    res.json({ data: rows })
+  } catch (err) {
+    console.error('GET /api/contract-adjustments error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.post('/api/contract-adjustments', async (req, res) => {
+  let conn
+  try {
+    const { action, target_processo_id, closed_by, client, case_type, value, start_date } = req.body || {}
+    if (!action || !['add', 'edit', 'remove'].includes(action)) {
+      return res.status(400).json({ error: 'action must be one of add, edit, remove' })
+    }
+    if (!closed_by) {
+      return res.status(400).json({ error: 'closed_by is required' })
+    }
+    if ((action === 'edit' || action === 'remove') && !target_processo_id) {
+      return res.status(400).json({ error: 'target_processo_id is required for edit/remove' })
+    }
+
+    const id = req.body?.id || crypto.randomUUID()
+    conn = await getConnection()
+    await conn.execute(
+      `INSERT INTO contract_adjustments (id, action, target_processo_id, closed_by, client, case_type, value, start_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [id, action, target_processo_id ?? null, closed_by, client ?? null, case_type ?? null, value ?? null, start_date ?? null],
+    )
+    const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])
+    res.status(201).json({ data: rows[0] ?? null })
+  } catch (err) {
+    console.error('POST /api/contract-adjustments error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.put('/api/contract-adjustments/:id', async (req, res) => {
+  let conn
+  try {
+    const { id } = req.params
+    const { client, case_type, value, start_date } = req.body || {}
+    conn = await getConnection()
+    await conn.execute(
+      `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ? WHERE id = ?`,
+      [client ?? null, case_type ?? null, value ?? null, start_date ?? null, id],
+    )
+    const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])
+    if (!rows.length) return res.status(404).json({ error: 'not found' })
+    res.json({ data: rows[0] })
+  } catch (err) {
+    console.error('PUT /api/contract-adjustments/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.delete('/api/contract-adjustments/:id', async (req, res) => {
+  let conn
+  try {
+    const { id } = req.params
+    conn = await getConnection()
+    await conn.execute(`DELETE FROM contract_adjustments WHERE id = ?`, [id])
+    res.json({ error: null })
+  } catch (err) {
+    console.error('DELETE /api/contract-adjustments/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
 const DOC_COLUMNS = [
   're_pre_prpocessual',
   'compro_end_pre_pro',

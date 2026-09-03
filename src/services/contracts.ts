@@ -1,4 +1,5 @@
-import { Contract } from '@/lib/types'
+import { Contract, ContractAdjustment } from '@/lib/types'
+import { fetchContractAdjustments } from './contract-adjustments'
 
 const CONTRACTS_STORAGE_KEY = 'controle-de-comis-contracts'
 
@@ -238,15 +239,27 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           }
         }
 
-        // Confirmed by the firm to be an erroneous duplicate case for this
-        // client (Tawanny Riul Salomao — "Saúde - Reembolso integral"
-        // R$3.000, under Camila Salles) — excluded from commission counting
-        // at their request rather than edited in the source database.
-        const EXCLUDED_PROCESS_IDS = new Set<string>(['24069'])
+        // Manual corrections (add/edit/remove a contract) made from the
+        // Equipe UI, kept in our own contract_adjustments table since we
+        // don't write back into the CRM's tables. A failure here shouldn't
+        // break the whole contracts fetch — just means no adjustments apply.
+        const { data: adjustments } = await fetchContractAdjustments()
+        const removedProcessIds = new Set<string>()
+        const editsByProcessId = new Map<string, ContractAdjustment>()
+        const addedAdjustments: ContractAdjustment[] = []
+        for (const adj of adjustments ?? []) {
+          if (adj.action === 'remove' && adj.target_processo_id) {
+            removedProcessIds.add(adj.target_processo_id)
+          } else if (adj.action === 'edit' && adj.target_processo_id) {
+            editsByProcessId.set(adj.target_processo_id, adj)
+          } else if (adj.action === 'add') {
+            addedAdjustments.push(adj)
+          }
+        }
 
         const contracts: Contract[] = []
         for (const [processId, r] of bestRowByProcessId) {
-          if (EXCLUDED_PROCESS_IDS.has(processId)) continue
+          if (removedProcessIds.has(processId)) continue
           const isTrabalhista = r.nom_tarefa === TASK_TRABALHISTA
           if (isTrabalhista) {
             const name = typeof r.Cliente === 'string' ? r.Cliente.trim().toLowerCase() : ''
@@ -261,26 +274,36 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             ? resolveCompetenciaDate(r.data_pgto_cliente, r.data_assinatura_contrato)
             : null
 
+          // A manual edit overrides only the fields it carries — everything
+          // else (payment method, status, closed_by...) stays as fetched.
+          const edit = editsByProcessId.get(processId)
+          const editedValue = edit?.value != null ? Number(edit.value) : null
+          const editedStartDate = edit?.start_date ? new Date(edit.start_date) : null
+
           contracts.push({
             id: processId,
             name: r.name ?? r.nom_tarefa ?? null,
-            client: r.Cliente ?? r.client ?? null,
+            client: edit?.client || r.Cliente || r.client || null,
             client_cpf: r.CPF ?? r.client_cpf ?? null,
             client_phone: r.client_phone ?? null,
             client_email: r.client_email ?? null,
             consultant_id: null,
             pre_processual_agent_id: null,
             service_type: isTrabalhista ? 'Trabalhista' : null,
-            case_type: typeof r.acao_cli === 'string' && r.acao_cli.trim() ? r.acao_cli.trim() : null,
-            contracted_value: parseNumericValue(r.valor_pagto ?? r.valor),
-            commission_base_value: parseNumericValue(r.valor_desconto_forma_pagamento),
+            case_type: edit?.case_type || (typeof r.acao_cli === 'string' && r.acao_cli.trim() ? r.acao_cli.trim() : null),
+            contracted_value: editedValue ?? parseNumericValue(r.valor_pagto ?? r.valor),
+            commission_base_value: editedValue ?? parseNumericValue(r.valor_desconto_forma_pagamento),
             entry_value: parseNumericValue(r.Entrada),
             entry_payment_method: normalizePaymentMethod(r.entry_payment_method),
             is_entry_paid: Boolean(r.data_entrada_pgto),
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
             status: r.status ?? 'Ativo',
-            start_date: startDate ? startDate.toISOString() : null,
+            start_date: editedStartDate
+              ? editedStartDate.toISOString()
+              : startDate
+                ? startDate.toISOString()
+                : null,
             end_date_planned: r.end_date_planned ?? null,
             cancellation_date: null,
             cancellation_reason: null,
@@ -299,6 +322,43 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             closed_by: typeof r.nome_solicitante === 'string' && r.nome_solicitante.trim()
               ? r.nome_solicitante.trim()
               : parseClosedByName(r.inserrido_pgto),
+          })
+        }
+
+        for (const adj of addedAdjustments) {
+          const value = adj.value != null ? Number(adj.value) : null
+          contracts.push({
+            id: adj.id,
+            name: adj.client,
+            client: adj.client,
+            client_cpf: null,
+            client_phone: null,
+            client_email: null,
+            consultant_id: null,
+            pre_processual_agent_id: null,
+            service_type: null,
+            case_type: adj.case_type,
+            contracted_value: value,
+            commission_base_value: value,
+            entry_value: null,
+            entry_payment_method: null,
+            is_entry_paid: null,
+            payment_method: null,
+            installments: null,
+            status: 'Ativo',
+            start_date: adj.start_date ? new Date(adj.start_date).toISOString() : null,
+            end_date_planned: null,
+            cancellation_date: null,
+            cancellation_reason: null,
+            internal_failure: null,
+            manager: null,
+            address: null,
+            notes: null,
+            created_at: adj.created_at,
+            budget_planned: null,
+            progress_percentage: null,
+            total_area: null,
+            closed_by: adj.closed_by,
           })
         }
 

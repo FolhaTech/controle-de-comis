@@ -66,6 +66,23 @@ export interface Contract {
   case_type: string | null
 }
 
+// A manual correction to the live CRM-derived contract list, applied on top
+// of it by fetchContracts() — 'add' introduces a contract the CRM doesn't
+// track, 'edit' overrides fields on a live one (target_processo_id), and
+// 'remove' excludes a live one entirely.
+export interface ContractAdjustment {
+  id: string
+  action: 'add' | 'edit' | 'remove'
+  target_processo_id: string | null
+  closed_by: string
+  client: string | null
+  case_type: string | null
+  value: number | null
+  start_date: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
 export interface Settings {
   goals: {
     individualContracts: number
