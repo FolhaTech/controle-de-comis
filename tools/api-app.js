@@ -169,7 +169,7 @@ app.get('/api/contract-adjustments', async (req, res) => {
 app.post('/api/contract-adjustments', async (req, res) => {
   let conn
   try {
-    const { action, target_processo_id, closed_by, client, case_type, value, start_date } = req.body || {}
+    const { action, target_processo_id, closed_by, client, case_type, value, start_date, status } = req.body || {}
     if (!action || !['add', 'edit', 'remove'].includes(action)) {
       return res.status(400).json({ error: 'action must be one of add, edit, remove' })
     }
@@ -183,9 +183,9 @@ app.post('/api/contract-adjustments', async (req, res) => {
     const id = req.body?.id || crypto.randomUUID()
     conn = await getConnection()
     await conn.execute(
-      `INSERT INTO contract_adjustments (id, action, target_processo_id, closed_by, client, case_type, value, start_date, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [id, action, target_processo_id ?? null, closed_by, client ?? null, case_type ?? null, value ?? null, start_date ?? null],
+      `INSERT INTO contract_adjustments (id, action, target_processo_id, closed_by, client, case_type, value, start_date, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [id, action, target_processo_id ?? null, closed_by, client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null],
     )
     const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])
     res.status(201).json({ data: rows[0] ?? null })
@@ -201,17 +201,17 @@ app.put('/api/contract-adjustments/:id', async (req, res) => {
   let conn
   try {
     const { id } = req.params
-    const { client, case_type, value, start_date, closed_by } = req.body || {}
+    const { client, case_type, value, start_date, closed_by, status } = req.body || {}
     conn = await getConnection()
     if (closed_by) {
       await conn.execute(
-        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, closed_by = ? WHERE id = ?`,
-        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, closed_by, id],
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, closed_by = ?, status = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, closed_by, status ?? null, id],
       )
     } else {
       await conn.execute(
-        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ? WHERE id = ?`,
-        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, id],
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, status = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null, id],
       )
     }
     const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])

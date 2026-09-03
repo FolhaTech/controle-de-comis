@@ -44,7 +44,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
-import { ContractAdjustmentForm, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
+import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
 import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
 import { contractValue as valueOf } from '@/lib/calculations'
@@ -114,6 +114,8 @@ export default function Contratos() {
         return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       case 'Revertido':
         return 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+      case 'Em processo':
+        return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       default:
         return 'bg-gray-100 text-gray-700'
     }
@@ -295,6 +297,7 @@ export default function Contratos() {
                         value: valueOf(editingContract),
                         start_date: editingContract.start_date ? editingContract.start_date.slice(0, 10) : '',
                         closed_by: editingContract.closed_by || '',
+                        status: toEditableStatus(editingContract.status),
                       }
                     : undefined
                 }

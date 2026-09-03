@@ -21,6 +21,7 @@ export type ContractAdjustmentInput = {
   case_type?: string | null
   value?: number | null
   start_date?: string | null
+  status?: ContractAdjustment['status']
 }
 
 export async function createContractAdjustment(input: ContractAdjustmentInput): Promise<{ data: ContractAdjustment | null; error: any }> {
@@ -45,6 +46,7 @@ export type ContractAdjustmentUpdate = {
   value?: number | null
   start_date?: string | null
   closed_by?: string
+  status?: ContractAdjustment['status']
 }
 
 export async function updateContractAdjustment(id: string, updates: ContractAdjustmentUpdate): Promise<{ data: ContractAdjustment | null; error: any }> {

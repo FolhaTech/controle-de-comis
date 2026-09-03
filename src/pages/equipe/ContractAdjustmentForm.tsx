@@ -11,6 +11,15 @@ export interface ContractAdjustmentFormValues {
   value: number
   start_date: string
   closed_by: string
+  status: 'Ativo' | 'Cancelado' | 'Em processo'
+}
+
+// The form's status select only offers these three — coerce anything else
+// (older CRM-derived values like "Distrato Pendente"/"Revertido", or null)
+// down to 'Ativo' when opening a contract for editing.
+export function toEditableStatus(status: string | null): ContractAdjustmentFormValues['status'] {
+  if (status === 'Cancelado' || status === 'Em processo') return status
+  return 'Ativo'
 }
 
 interface ContractAdjustmentFormProps {
@@ -35,6 +44,7 @@ export function ContractAdjustmentForm({
   const [value, setValue] = useState(initialValues?.value != null ? String(initialValues.value) : '')
   const [startDate, setStartDate] = useState(initialValues?.start_date ?? '')
   const [closedBy, setClosedBy] = useState(initialValues?.closed_by ?? '')
+  const [status, setStatus] = useState<ContractAdjustmentFormValues['status']>(initialValues?.status ?? 'Ativo')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const numericValue = Number(value.replace(',', '.'))
@@ -55,6 +65,7 @@ export function ContractAdjustmentForm({
         value: numericValue,
         start_date: startDate,
         closed_by: closedBy,
+        status,
       })
     } finally {
       setIsSubmitting(false)
@@ -95,6 +106,19 @@ export function ContractAdjustmentForm({
       <div className="space-y-1">
         <Label htmlFor="adj-date">Data</Label>
         <Input id="adj-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="adj-status">Status</Label>
+        <Select value={status} onValueChange={(v) => setStatus(v as ContractAdjustmentFormValues['status'])}>
+          <SelectTrigger id="adj-status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Ativo">Ativo</SelectItem>
+            <SelectItem value="Cancelado">Cancelado</SelectItem>
+            <SelectItem value="Em processo">Em processo</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>

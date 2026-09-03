@@ -79,6 +79,9 @@ export interface ContractAdjustment {
   case_type: string | null
   value: number | null
   start_date: string | null
+  // Informational only for now — doesn't affect the commission calculation,
+  // just overrides what's shown as the contract's status badge.
+  status: 'Ativo' | 'Cancelado' | 'Em processo' | null
   created_at: string | null
   updated_at: string | null
 }

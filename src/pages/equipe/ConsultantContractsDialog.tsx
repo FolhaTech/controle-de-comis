@@ -39,7 +39,7 @@ import {
 import type { Contract, Consultant, Settings } from '@/lib/types'
 import { format } from 'date-fns'
 import { useContractRowActions } from '@/hooks/use-contract-row-actions'
-import { ContractAdjustmentForm, type ContractAdjustmentFormValues } from './ContractAdjustmentForm'
+import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './ContractAdjustmentForm'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -68,6 +68,8 @@ function getStatusColor(status: string | null) {
       return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
     case 'Revertido':
       return 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+    case 'Em processo':
+      return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
     default:
       return 'bg-gray-100 text-gray-700'
   }
@@ -364,6 +366,7 @@ export function ConsultantContractsDialog({
                   case_type: editingContract.case_type || '',
                   value: valueOf(editingContract),
                   start_date: toDateInputValue(editingContract.start_date),
+                  status: toEditableStatus(editingContract.status),
                 }
               : undefined
           }

@@ -293,7 +293,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             : null
 
           // A manual edit overrides only the fields it carries — everything
-          // else (payment method, status...) stays as fetched.
+          // else (payment method...) stays as fetched.
           const edit = editsByProcessId.get(processId)
           const editedValue = edit?.value != null ? Number(edit.value) : null
           const editedStartDate = edit?.start_date ? new Date(edit.start_date) : null
@@ -316,7 +316,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             is_entry_paid: Boolean(r.data_entrada_pgto),
             payment_method: normalizePaymentMethod(r.Formas_Pagamento ?? r.payment_method),
             installments: parseInstallments(r.Qtd_Parcelas),
-            status: r.status ?? 'Ativo',
+            status: edit?.status || r.status || 'Ativo',
             start_date: editedStartDate
               ? editedStartDate.toISOString()
               : startDate
@@ -366,7 +366,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             is_entry_paid: null,
             payment_method: null,
             installments: null,
-            status: 'Ativo',
+            status: adj.status || 'Ativo',
             start_date: adj.start_date ? new Date(adj.start_date).toISOString() : null,
             end_date_planned: null,
             cancellation_date: null,
