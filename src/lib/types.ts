@@ -50,6 +50,13 @@ export interface Contract {
   cancellation_date: string | null
   cancellation_reason: string | null
   internal_failure: boolean | null
+  // Set only via the add/edit contract form when status is 'Cancelado': the
+  // amount to claw back from commission for this specific cancellation. Null
+  // means the contract was never edited through that form (its status came
+  // straight from the CRM) — callers fall back to the pre-existing behavior
+  // of deducting the full contract value in that case. See
+  // calculations.ts's cancellationDeductionAmount.
+  cancellation_deduction: number | null
   created_at: string | null
   manager: string | null
   address: string | null
@@ -82,6 +89,12 @@ export interface ContractAdjustment {
   // Informational only for now — doesn't affect the commission calculation,
   // just overrides what's shown as the contract's status badge.
   status: 'Ativo' | 'Cancelado' | 'Em processo' | null
+  // Only meaningful when status is 'Cancelado' — see Contract's field of the
+  // same name. Mandatory 1-year-from-start_date rule decides whether this is
+  // populated at all (see ContractAdjustmentForm); 0 means the case was
+  // cancelled but nothing should be clawed back (e.g. no commission was ever
+  // paid on it), while null means the deduction section didn't apply.
+  cancellation_deduction: number | null
   created_at: string | null
   updated_at: string | null
 }

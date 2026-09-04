@@ -37,6 +37,18 @@ export function isContractValid(contract: Contract) {
   return true
 }
 
+// How much to claw back from commission for one cancelled contract. A
+// non-null cancellation_deduction means it went through the add/edit
+// contract form, which already applied the mandatory 1-year-from-start_date
+// rule (0 if the contract is older than a year, the entered amount
+// otherwise) — that value is authoritative. A cancelled contract that was
+// never edited through the form (status came straight from the CRM) has no
+// such value on file, so it falls back to the full contract value.
+export function cancellationDeductionAmount(contract: Contract): number {
+  if (contract.status !== 'Cancelado' || contract.internal_failure) return 0
+  return contract.cancellation_deduction != null ? contract.cancellation_deduction : contractValue(contract)
+}
+
 export function filterContractsByPeriod(contracts: Contract[], month: number, year: number) {
   return contracts.filter((c) => {
     if (!c.start_date) return false

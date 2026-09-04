@@ -367,6 +367,7 @@ export function ConsultantContractsDialog({
                   value: valueOf(editingContract),
                   start_date: toDateInputValue(editingContract.start_date),
                   status: toEditableStatus(editingContract.status),
+                  cancellation_deduction: editingContract.cancellation_deduction,
                 }
               : undefined
           }

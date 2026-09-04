@@ -298,6 +298,7 @@ export default function Contratos() {
                         start_date: editingContract.start_date ? editingContract.start_date.slice(0, 10) : '',
                         closed_by: editingContract.closed_by || '',
                         status: toEditableStatus(editingContract.status),
+                        cancellation_deduction: editingContract.cancellation_deduction,
                       }
                     : undefined
                 }

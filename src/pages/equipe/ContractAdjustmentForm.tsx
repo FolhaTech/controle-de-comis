@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -12,6 +13,20 @@ export interface ContractAdjustmentFormValues {
   start_date: string
   closed_by: string
   status: 'Ativo' | 'Cancelado' | 'Em processo'
+  // Only meaningful when status is 'Cancelado' — see the same field on
+  // Contract/ContractAdjustment in lib/types.ts.
+  cancellation_deduction: number | null
+}
+
+// Mandatory rule (no manual override): a contract cancelled within 1 year of
+// its own start_date has its commission clawed back; past that, it's exempt.
+export function isWithinOneYearOfStart(startDateStr: string): boolean {
+  if (!startDateStr) return false
+  const start = new Date(startDateStr)
+  if (Number.isNaN(start.getTime())) return false
+  const oneYearLater = new Date(start)
+  oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+  return new Date() < oneYearLater
 }
 
 // The form's status select only offers these three — coerce anything else
@@ -45,6 +60,9 @@ export function ContractAdjustmentForm({
   const [startDate, setStartDate] = useState(initialValues?.start_date ?? '')
   const [closedBy, setClosedBy] = useState(initialValues?.closed_by ?? '')
   const [status, setStatus] = useState<ContractAdjustmentFormValues['status']>(initialValues?.status ?? 'Ativo')
+  const [cancellationDeduction, setCancellationDeduction] = useState(
+    initialValues?.cancellation_deduction != null ? String(initialValues.cancellation_deduction) : '',
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const numericValue = Number(value.replace(',', '.'))
@@ -54,6 +72,10 @@ export function ContractAdjustmentForm({
     numericValue >= 0 &&
     startDate.length > 0 &&
     (!consultantOptions || closedBy.length > 0)
+
+  const isCancelled = status === 'Cancelado'
+  const withinOneYear = isCancelled && isWithinOneYearOfStart(startDate)
+  const numericDeduction = Number(cancellationDeduction.replace(',', '.'))
 
   const handleSubmit = async () => {
     if (!isValid) return
@@ -66,6 +88,13 @@ export function ContractAdjustmentForm({
         start_date: startDate,
         closed_by: closedBy,
         status,
+        cancellation_deduction: !isCancelled
+          ? null
+          : !withinOneYear
+            ? 0
+            : Number.isFinite(numericDeduction) && numericDeduction >= 0
+              ? numericDeduction
+              : 0,
       })
     } finally {
       setIsSubmitting(false)
@@ -120,6 +149,37 @@ export function ContractAdjustmentForm({
           </SelectContent>
         </Select>
       </div>
+      {isCancelled && (
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="adj-deduct" className="cursor-default">
+              Descontar valor?
+            </Label>
+            <Switch id="adj-deduct" checked={withinOneYear} disabled />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {startDate.length === 0
+              ? 'Informe a data do contrato para calcular a regra de 1 ano.'
+              : withinOneYear
+                ? 'Cancelado dentro de 1 ano da data do contrato — o desconto é aplicado automaticamente.'
+                : 'Contrato fechado há mais de 1 ano — não será descontado.'}
+          </p>
+          {withinOneYear && (
+            <div className="space-y-1">
+              <Label htmlFor="adj-deduct-value">Quantidade a descontar (R$)</Label>
+              <Input
+                id="adj-deduct-value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={cancellationDeduction}
+                onChange={(e) => setCancellationDeduction(e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+          )}
+        </div>
+      )}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancelar

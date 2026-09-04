@@ -2,6 +2,7 @@ import {
   calculateAttendantCommission,
   calculateCommissionBreakdown,
   calculateMonthlyDeduction,
+  cancellationDeductionAmount,
   contractValue,
   getAjudaCusto,
   isContractValid,
@@ -86,7 +87,7 @@ export function PremiacaoReport({
 
   const ajudaCusto = getAjudaCusto(consultant)
   const desconto = calculateMonthlyDeduction(consultantDeductions, consultant.name, month, year)
-  const canceladosTotal = cancelledContracts.reduce((sum, c) => sum + contractValue(c), 0)
+  const canceladosTotal = cancelledContracts.reduce((sum, c) => sum + cancellationDeductionAmount(c), 0)
   const totalNotaFiscal = totalPremiacao + ajudaCusto - canceladosTotal - desconto
 
   // "Poderia ter chegado aqui": what this month's premiação would be one
@@ -173,7 +174,7 @@ export function PremiacaoReport({
                 }}
               >
                 <span>{c.client || c.name}</span>
-                <span>{currency(contractValue(c))}</span>
+                <span>{currency(cancellationDeductionAmount(c))}</span>
               </div>
             ))
           )}
