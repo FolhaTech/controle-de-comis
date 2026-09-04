@@ -248,6 +248,24 @@ export function calculatePersonMonthlyCommission(
   }
 }
 
+// How much of personName's commission for month/year must be clawed back
+// for cancelled contracts — see cancellationDeductionAmount. isContractValid
+// already excludes a cancelled contract's own commission from
+// calculatePersonMonthlyCommission, but this is a further, separate
+// deduction (e.g. the value already paid out before the cancellation), so it
+// must be subtracted everywhere commission is shown, not just on the PDF.
+export function calculateCancelamentosDeduction(
+  contracts: Contract[],
+  personName: string,
+  month: number,
+  year: number,
+): number {
+  const personContracts = filterPersonPeriodContracts(contracts, personName, month, year)
+  return personContracts
+    .filter((c) => c.status === 'Cancelado' && !c.internal_failure)
+    .reduce((sum, c) => sum + cancellationDeductionAmount(c), 0)
+}
+
 // Sum of the monthly installment of every deduction (advance, loan,
 // equipment...) active for `personName` in `month`/`year`. A deduction of
 // total_value split into `installments` starting at start_month/start_year

@@ -31,7 +31,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
-import { calculatePersonMonthlyCommission, calculateMonthlyDeduction, getAjudaCusto } from '@/lib/calculations'
+import {
+  calculatePersonMonthlyCommission,
+  calculateMonthlyDeduction,
+  calculateCancelamentosDeduction,
+  getAjudaCusto,
+} from '@/lib/calculations'
 import { ConsultantForm } from './equipe/ConsultantForm'
 import { MonthlyValuesTable } from './equipe/MonthlyValuesTable'
 import { CommissionMonthlyTable } from './equipe/CommissionMonthlyTable'
@@ -319,8 +324,14 @@ export default function Equipe() {
                   filter.month,
                   filter.year,
                 )
+                const cancelamentosDeduction = calculateCancelamentosDeduction(
+                  contracts,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                )
                 const remuneracaoComAjuda =
-                  remuneracao + getAjudaCusto(consultant) - monthlyDeduction
+                  remuneracao + getAjudaCusto(consultant) - monthlyDeduction - cancelamentosDeduction
                 return (
                   <TableRow key={consultant.id} className="hover:bg-secondary/20 transition-colors">
                     <TableCell className="font-medium">{consultant.name}</TableCell>
@@ -354,6 +365,11 @@ export default function Equipe() {
                       {monthlyDeduction > 0 && (
                         <span className="block text-[10px] font-normal text-destructive">
                           -{currencyFormatter.format(monthlyDeduction)} desconto
+                        </span>
+                      )}
+                      {cancelamentosDeduction > 0 && (
+                        <span className="block text-[10px] font-normal text-destructive">
+                          -{currencyFormatter.format(cancelamentosDeduction)} cancelados
                         </span>
                       )}
                     </TableCell>
