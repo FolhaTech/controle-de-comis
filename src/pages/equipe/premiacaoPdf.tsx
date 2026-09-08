@@ -111,6 +111,10 @@ export function PremiacaoReport({
       : nextTier
         ? nonTrabalhistaValue * (nextTier.percentage / 100) + trabalhista.commissionValue + ajudaCusto - canceladosTotal - desconto
         : totalNotaFiscal
+  // The next milestone shown alongside "Poderia ter chegado aqui" — how many
+  // contracts would unlock that projected value.
+  const nextGoalLabel =
+    nonTrabalhistaValid.length === 0 || !nextTier ? null : `${nextTier.min} Contratos`
 
   const itemsByContractId = new Map(breakdown.items.map((i) => [i.contract.id, i]))
 
@@ -200,7 +204,7 @@ export function PremiacaoReport({
       </div>
 
       {/* Progress staircase */}
-      <StaircaseChart current={totalNotaFiscal} target={poderiaTerChegado} />
+      <StaircaseChart current={totalNotaFiscal} target={poderiaTerChegado} nextGoalLabel={nextGoalLabel} />
 
       {/* Detail table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 18, fontSize: 11 }}>
@@ -279,7 +283,15 @@ function MountainLogo() {
 // The "VOCÊ ESTÁ AQUI / PODERIA TER CHEGADO AQUI" checkered staircase from
 // the firm's official Premiação template — four rising steps in navy/gold,
 // current total called out at the base, the next-tier total at the top.
-function StaircaseChart({ current, target }: { current: number; target: number }) {
+function StaircaseChart({
+  current,
+  target,
+  nextGoalLabel,
+}: {
+  current: number
+  target: number
+  nextGoalLabel: string | null
+}) {
   const unit = 26 // px per step
   const colWidth = 40
   const barGap = 4
@@ -287,7 +299,7 @@ function StaircaseChart({ current, target }: { current: number; target: number }
   const chartHeight = unit * 4
   const badgeHeight = 26
   const barsBottom = 22 // reserved space for the "VOCÊ ESTÁ AQUI" label below the bars
-  const labelHeight = 32 // reserved space for the "PODERIA TER CHEGADO AQUI" label above
+  const labelHeight = nextGoalLabel ? 42 : 32 // reserved space for the "PODERIA TER CHEGADO AQUI" label (+goal line) above
 
   const bar1Top = barsBottom + unit
   const bar4Top = barsBottom + chartHeight
@@ -345,6 +357,12 @@ function StaircaseChart({ current, target }: { current: number; target: number }
         PODERIA TER
         <br />
         CHEGADO AQUI
+        {nextGoalLabel && (
+          <>
+            <br />
+            <span style={{ fontSize: 8, fontWeight: 'normal', color: RED }}>({nextGoalLabel})</span>
+          </>
+        )}
       </div>
     </div>
   )
