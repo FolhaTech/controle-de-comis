@@ -82,6 +82,11 @@ export function PremiacaoReport({
 
   const validContracts = personContracts.filter(isContractValid)
   const validCount = validContracts.length
+  // The detail table must never show a cancelled contract, even one with
+  // internal_failure (which isContractValid still counts as "valid" for
+  // META ATINGIDA/premiação purposes) — those clawback-exempt cases still
+  // belong only in the "Resumo cancelados" box above.
+  const tableContracts = validContracts.filter((c) => c.status !== 'Cancelado')
   const validTotalValue = validContracts.reduce((sum, c) => sum + contractValue(c), 0)
   const ticketMedio = validCount > 0 ? validTotalValue / validCount : 0
 
@@ -209,7 +214,7 @@ export function PremiacaoReport({
           </tr>
         </thead>
         <tbody>
-          {validContracts.map((c, idx) => {
+          {tableContracts.map((c, idx) => {
             const item = itemsByContractId.get(c.id)
             const isTrabalhista = c.service_type === 'Trabalhista'
             const isBelowStandardValue = !isTrabalhista && contractValue(c) < 3000
@@ -239,7 +244,7 @@ export function PremiacaoReport({
               </tr>
             )
           })}
-          {validContracts.length === 0 && (
+          {tableContracts.length === 0 && (
             <tr>
               <td colSpan={5} style={{ ...cellStyle('left'), textAlign: 'center', color: '#666' }}>
                 Nenhum contrato nesta competência.
