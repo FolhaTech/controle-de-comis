@@ -209,7 +209,7 @@ export function PremiacaoReport({
           </tr>
         </thead>
         <tbody>
-          {personContracts.map((c, idx) => {
+          {validContracts.map((c, idx) => {
             const item = itemsByContractId.get(c.id)
             const isTrabalhista = c.service_type === 'Trabalhista'
             const isBelowStandardValue = !isTrabalhista && contractValue(c) < 3000
@@ -239,7 +239,7 @@ export function PremiacaoReport({
               </tr>
             )
           })}
-          {personContracts.length === 0 && (
+          {validContracts.length === 0 && (
             <tr>
               <td colSpan={5} style={{ ...cellStyle('left'), textAlign: 'center', color: '#666' }}>
                 Nenhum contrato nesta competência.
