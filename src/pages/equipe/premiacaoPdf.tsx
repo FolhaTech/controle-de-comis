@@ -105,8 +105,6 @@ export function PremiacaoReport({
   // times that tier's minimum contract count (not just her current total
   // value re-rated), since the whole point is the value of the goal she
   // hasn't reached yet, not a bonus on what she's already closed.
-  // Trabalhista is flat-rate per contract, not tier-based on value, so it
-  // never has a "next tier" upside — only the non-Trabalhista slice does.
   const nonTrabalhistaValid = validContracts.filter((c) => c.service_type !== 'Trabalhista')
   const nonTrabalhistaValue = nonTrabalhistaValid.reduce((sum, c) => sum + contractValue(c), 0)
   const avgNonTrabalhistaValue =
@@ -114,9 +112,18 @@ export function PremiacaoReport({
   const nextTier = settings.tiers
     .filter((t) => t.min > nonTrabalhistaValid.length)
     .sort((a, b) => a.min - b.min)[0]
+  // Trabalhista is flat-rate per contract rather than tier-based on value,
+  // but it still climbs its own count-based ladder (calculateAttendantCommission's
+  // tiers) — a 100%-Trabalhista consultant (e.g. Denise) has a real next
+  // goal there even though she has no non-Trabalhista upside at all.
+  const nextAttendantTier = settings.attendantCommission.tiers
+    .filter((t) => t.min > trabalhistaContracts.length)
+    .sort((a, b) => a.min - b.min)[0]
   const poderiaTerChegado =
     nonTrabalhistaValid.length === 0
-      ? totalNotaFiscal
+      ? nextAttendantTier
+        ? nextAttendantTier.min * nextAttendantTier.valuePerContract + ajudaCusto - canceladosTotal - desconto
+        : totalNotaFiscal
       : nextTier
         ? avgNonTrabalhistaValue * nextTier.min * (nextTier.percentage / 100) +
           trabalhista.commissionValue +
@@ -127,7 +134,13 @@ export function PremiacaoReport({
   // The next milestone shown alongside "Poderia ter chegado aqui" — how many
   // contracts would unlock that projected value.
   const nextGoalLabel =
-    nonTrabalhistaValid.length === 0 || !nextTier ? null : `${nextTier.min} Contratos`
+    nonTrabalhistaValid.length === 0
+      ? nextAttendantTier
+        ? `${nextAttendantTier.min} Contratos`
+        : null
+      : nextTier
+        ? `${nextTier.min} Contratos`
+        : null
 
   const itemsByContractId = new Map(breakdown.items.map((i) => [i.contract.id, i]))
 
