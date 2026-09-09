@@ -100,13 +100,17 @@ export function PremiacaoReport({
   const canceladosTotal = cancelledContracts.reduce((sum, c) => sum + cancellationDeductionAmount(c), 0)
   const totalNotaFiscal = totalPremiacao + ajudaCusto - canceladosTotal - desconto
 
-  // "Poderia ter chegado aqui": what this month's premiação would be one
-  // commission tier up — a motivational look at the value of a few more
-  // contracts, not a literal projection tied to any specific real client.
+  // "Poderia ter chegado aqui": a genuine projection of what she'd earn at
+  // the next commission tier — her average non-Trabalhista contract value
+  // times that tier's minimum contract count (not just her current total
+  // value re-rated), since the whole point is the value of the goal she
+  // hasn't reached yet, not a bonus on what she's already closed.
   // Trabalhista is flat-rate per contract, not tier-based on value, so it
   // never has a "next tier" upside — only the non-Trabalhista slice does.
   const nonTrabalhistaValid = validContracts.filter((c) => c.service_type !== 'Trabalhista')
   const nonTrabalhistaValue = nonTrabalhistaValid.reduce((sum, c) => sum + contractValue(c), 0)
+  const avgNonTrabalhistaValue =
+    nonTrabalhistaValid.length > 0 ? nonTrabalhistaValue / nonTrabalhistaValid.length : 0
   const nextTier = settings.tiers
     .filter((t) => t.min > nonTrabalhistaValid.length)
     .sort((a, b) => a.min - b.min)[0]
@@ -114,7 +118,11 @@ export function PremiacaoReport({
     nonTrabalhistaValid.length === 0
       ? totalNotaFiscal
       : nextTier
-        ? nonTrabalhistaValue * (nextTier.percentage / 100) + trabalhista.commissionValue + ajudaCusto - canceladosTotal - desconto
+        ? avgNonTrabalhistaValue * nextTier.min * (nextTier.percentage / 100) +
+          trabalhista.commissionValue +
+          ajudaCusto -
+          canceladosTotal -
+          desconto
         : totalNotaFiscal
   // The next milestone shown alongside "Poderia ter chegado aqui" — how many
   // contracts would unlock that projected value.
