@@ -87,6 +87,10 @@ export function PremiacaoReport({
   // META ATINGIDA/premiação purposes) — those clawback-exempt cases still
   // belong only in the "Resumo cancelados" box above.
   const tableContracts = validContracts.filter((c) => c.status !== 'Cancelado')
+  // META ATINGIDA: contracts reached minus cancelled ones, full stop — no
+  // internal_failure exception here, unlike validCount below (which still
+  // feeds the financial totals/ticket médio, left untouched).
+  const metaAtingidaCount = tableContracts.length
   const validTotalValue = validContracts.reduce((sum, c) => sum + contractValue(c), 0)
   const ticketMedio = validCount > 0 ? validTotalValue / validCount : 0
 
@@ -154,7 +158,7 @@ export function PremiacaoReport({
           Resumo prestação de serviços
         </div>
         <SummaryRowCentered label="TICKET MÉDIO" value={currency(ticketMedio)} />
-        <SummaryRowCentered label="META ATINGIDA" value={`${validCount} Contratos`} />
+        <SummaryRowCentered label="META ATINGIDA" value={`${metaAtingidaCount} Contratos`} />
         <SummaryRow label="Premiação" value={currency(totalPremiacao)} />
         <SummaryRow label="Ajuda de custo" value={currency(ajudaCusto)} />
         <SummaryRow label="cancelados (-)" value={currency(canceladosTotal)} />
