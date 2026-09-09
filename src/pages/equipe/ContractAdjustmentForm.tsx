@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -16,6 +17,9 @@ export interface ContractAdjustmentFormValues {
   // Only meaningful when status is 'Cancelado' — see the same field on
   // Contract/ContractAdjustment in lib/types.ts.
   cancellation_deduction: number | null
+  // Required when registering a brand-new contract (no initialValues);
+  // optional when editing one already on file.
+  notes: string
 }
 
 // Mandatory rule (no manual override): a contract cancelled within 1 year of
@@ -63,7 +67,10 @@ export function ContractAdjustmentForm({
   const [cancellationDeduction, setCancellationDeduction] = useState(
     initialValues?.cancellation_deduction != null ? String(initialValues.cancellation_deduction) : '',
   )
+  const [notes, setNotes] = useState(initialValues?.notes ?? '')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const isNewContract = !initialValues
 
   const numericValue = Number(value.replace(',', '.'))
   const isValid =
@@ -71,7 +78,8 @@ export function ContractAdjustmentForm({
     Number.isFinite(numericValue) &&
     numericValue >= 0 &&
     startDate.length > 0 &&
-    (!consultantOptions || closedBy.length > 0)
+    (!consultantOptions || closedBy.length > 0) &&
+    (!isNewContract || notes.trim().length > 0)
 
   const isCancelled = status === 'Cancelado'
   const withinOneYear = isCancelled && isWithinOneYearOfStart(startDate)
@@ -95,6 +103,7 @@ export function ContractAdjustmentForm({
             : Number.isFinite(numericDeduction) && numericDeduction >= 0
               ? numericDeduction
               : 0,
+        notes: notes.trim(),
       })
     } finally {
       setIsSubmitting(false)
@@ -135,6 +144,16 @@ export function ContractAdjustmentForm({
       <div className="space-y-1">
         <Label htmlFor="adj-date">Data</Label>
         <Input id="adj-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="adj-notes">Observação{isNewContract && ' *'}</Label>
+        <Textarea
+          id="adj-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Detalhes sobre o contrato..."
+          rows={3}
+        />
       </div>
       <div className="space-y-1">
         <Label htmlFor="adj-status">Status</Label>

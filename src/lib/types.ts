@@ -95,6 +95,9 @@ export interface ContractAdjustment {
   // cancelled but nothing should be clawed back (e.g. no commission was ever
   // paid on it), while null means the deduction section didn't apply.
   cancellation_deduction: number | null
+  // Required when adding a new contract through the form (see
+  // ContractAdjustmentForm) — optional when editing one already on file.
+  notes: string | null
   created_at: string | null
   updated_at: string | null
 }

@@ -299,6 +299,7 @@ export default function Contratos() {
                         closed_by: editingContract.closed_by || '',
                         status: toEditableStatus(editingContract.status),
                         cancellation_deduction: editingContract.cancellation_deduction,
+                        notes: editingContract.notes || '',
                       }
                     : undefined
                 }
