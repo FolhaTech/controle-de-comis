@@ -292,7 +292,17 @@ export function ConsultantContractsDialog({
                     const isTrabalhista = c.service_type === 'Trabalhista'
                     return (
                       <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.client || c.name || '—'}</TableCell>
+                        <TableCell className="font-medium">
+                          {c.client || c.name || '—'}
+                          {c.notes && (
+                            <span
+                              className="text-[10px] block text-muted-foreground italic truncate max-w-[220px] font-normal"
+                              title={c.notes}
+                            >
+                              Obs: {c.notes}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {c.case_type || '—'}
                         </TableCell>

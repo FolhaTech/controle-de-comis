@@ -398,6 +398,14 @@ export default function Contratos() {
                         <span className="text-[10px] block text-muted-foreground">
                           {contract.client_cpf || ''}
                         </span>
+                        {contract.notes && (
+                          <span
+                            className="text-[10px] block text-muted-foreground italic truncate max-w-[220px]"
+                            title={contract.notes}
+                          >
+                            Obs: {contract.notes}
+                          </span>
+                        )}
                       </div>
                       {(contract.client_phone || contract.client_email) && (
                         <Tooltip>
