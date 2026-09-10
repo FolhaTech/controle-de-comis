@@ -89,9 +89,16 @@ export function PremiacaoReport({
   const tableContracts = validContracts.filter((c) => c.status !== 'Cancelado')
   // META ATINGIDA: contracts reached (tableContracts already excludes every
   // cancelled contract) minus the cancelled count shown in "Resumo
-  // cancelados" again, per explicit instruction — financial totals and
-  // ticket médio are untouched, still based on validContracts.
-  const metaAtingidaCount = tableContracts.length - cancelledContracts.length
+  // cancelados" again, per explicit instruction — but only the ones that
+  // actually cost her something. A cancelled contract with R$0,00 deducted
+  // (e.g. closed over a year ago, so exempt from the clawback) didn't take
+  // anything off her goal, so it shouldn't take a contract off the count
+  // either. Financial totals and ticket médio are untouched, still based on
+  // validContracts.
+  const chargedCancelledCount = cancelledContracts.filter(
+    (c) => cancellationDeductionAmount(c) > 0,
+  ).length
+  const metaAtingidaCount = tableContracts.length - chargedCancelledCount
   const validTotalValue = validContracts.reduce((sum, c) => sum + contractValue(c), 0)
   const ticketMedio = validCount > 0 ? validTotalValue / validCount : 0
 
