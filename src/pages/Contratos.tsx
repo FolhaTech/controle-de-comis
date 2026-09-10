@@ -47,7 +47,7 @@ import useAppStore from '@/stores/useAppStore'
 import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
 import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
-import { contractValue as valueOf } from '@/lib/calculations'
+import { contractPeriodDate, contractValue as valueOf } from '@/lib/calculations'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
@@ -89,8 +89,8 @@ export default function Contratos() {
       .toLowerCase()
       .includes(contratoSearchTerm.toLowerCase())
     if (viewMode === 'all') return matchesSearch && matchesContrato
-    if (!c?.start_date) return false
-    const d = new Date(c.start_date)
+    const d = contractPeriodDate(c)
+    if (!d) return false
     return (
       d.getMonth() + 1 === filter.month &&
       d.getFullYear() === filter.year &&

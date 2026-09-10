@@ -3,6 +3,7 @@ import {
   calculateCommissionBreakdown,
   calculateMonthlyDeduction,
   cancellationDeductionAmount,
+  contractPeriodDate,
   contractValue,
   getAjudaCusto,
   isContractValid,
@@ -64,8 +65,8 @@ export function PremiacaoReport({
 
   const personContracts = contracts.filter((c) => {
     if (!c.closed_by || normalize(c.closed_by) !== target) return false
-    if (!c.start_date) return false
-    const d = new Date(c.start_date)
+    const d = contractPeriodDate(c)
+    if (!d) return false
     return d.getMonth() + 1 === month && d.getFullYear() === year && d <= now
   })
 

@@ -37,6 +37,22 @@ export function isContractValid(contract: Contract) {
   return true
 }
 
+// The date a contract counts against for month/year filtering everywhere in
+// the app. Normally that's its own start_date — but a cancelled contract
+// (with a cancellation_date on file, see ContractAdjustmentForm) counts
+// against the month it was CANCELLED in instead: the clawback is a new
+// event landing in that month, not a retroactive edit to a period that may
+// already be closed.
+export function contractPeriodDate(contract: Contract): Date | null {
+  if (contract.status === 'Cancelado' && contract.cancellation_date) {
+    const cancelled = new Date(contract.cancellation_date)
+    if (!Number.isNaN(cancelled.getTime())) return cancelled
+  }
+  if (!contract.start_date) return null
+  const start = new Date(contract.start_date)
+  return Number.isNaN(start.getTime()) ? null : start
+}
+
 // How much to claw back from commission for one cancelled contract. A
 // non-null cancellation_deduction means it went through the add/edit
 // contract form, which already applied the mandatory 1-year-from-start_date
@@ -51,8 +67,8 @@ export function cancellationDeductionAmount(contract: Contract): number {
 
 export function filterContractsByPeriod(contracts: Contract[], month: number, year: number) {
   return contracts.filter((c) => {
-    if (!c.start_date) return false
-    const d = new Date(c.start_date)
+    const d = contractPeriodDate(c)
+    if (!d) return false
     return d.getMonth() + 1 === month && d.getFullYear() === year
   })
 }
@@ -105,12 +121,12 @@ export function buildPersonMonthlyTotals(
   }
 
   for (const c of contracts) {
-    if (!c.closed_by || !c.start_date) continue
+    if (!c.closed_by) continue
     const monthsBuckets = contractsByPersonMonth.get(normalize(c.closed_by))
     if (!monthsBuckets) continue
 
-    const date = new Date(c.start_date)
-    if (date.getFullYear() !== year || date > now) continue
+    const date = contractPeriodDate(c)
+    if (!date || date.getFullYear() !== year || date > now) continue
     monthsBuckets[date.getMonth()].push(c)
   }
 
@@ -140,9 +156,10 @@ export function countValidContractsByPerson(
   const target = normalize(personName)
 
   return contracts.filter((c) => {
-    if (!isContractValid(c) || !c.closed_by || !c.start_date) return false
+    if (!isContractValid(c) || !c.closed_by) return false
     if (normalize(c.closed_by) !== target) return false
-    const date = new Date(c.start_date)
+    const date = contractPeriodDate(c)
+    if (!date) return false
     return date.getMonth() + 1 === month && date.getFullYear() === year
   }).length
 }
@@ -233,8 +250,8 @@ function filterPersonPeriodContracts(
 
   return contracts.filter((c) => {
     if (!c.closed_by || normalize(c.closed_by) !== target) return false
-    if (!c.start_date) return false
-    const d = new Date(c.start_date)
+    const d = contractPeriodDate(c)
+    if (!d) return false
     return d.getMonth() + 1 === month && d.getFullYear() === year && d <= now
   })
 }

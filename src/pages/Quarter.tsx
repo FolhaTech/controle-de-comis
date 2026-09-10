@@ -32,7 +32,7 @@ import { format } from 'date-fns'
 import { fetchQuarterData } from '@/services/processos'
 import { DocumentIndicators } from './processos/DocumentIndicators'
 import useAppStore from '@/stores/useAppStore'
-import { contractValue } from '@/lib/calculations'
+import { contractPeriodDate, contractValue } from '@/lib/calculations'
 import type { Process, QuarterData } from '@/lib/processos'
 
 const QUARTERS = [
@@ -103,8 +103,8 @@ export default function Quarter() {
   const quarterContracts = useMemo(() => {
     const { startDate, nextStartDate } = getQuarterDateRange(year, quarter)
     return contracts.filter((contract) => {
-      if (!contract.start_date) return false
-      const date = new Date(contract.start_date)
+      const date = contractPeriodDate(contract)
+      if (!date) return false
       return date >= new Date(startDate) && date < new Date(nextStartDate)
     })
   }, [contracts, year, quarter])

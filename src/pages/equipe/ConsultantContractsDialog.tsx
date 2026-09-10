@@ -34,6 +34,7 @@ import {
   isContractValid,
   calculateCommissionBreakdown,
   calculateAttendantCommission,
+  contractPeriodDate,
   contractValue as valueOf,
 } from '@/lib/calculations'
 import type { Contract, Consultant, Settings } from '@/lib/types'
@@ -153,8 +154,8 @@ export function ConsultantContractsDialog({
         .filter((c) => c.closed_by && normalize(c.closed_by) === target)
         .filter((c) => {
           if (period === 'all') return true
-          if (!c.start_date) return false
-          const d = new Date(c.start_date)
+          const d = contractPeriodDate(c)
+          if (!d) return false
 
           if (period === 'custom') {
             if (!customFrom && !customTo) return false
