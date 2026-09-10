@@ -22,6 +22,7 @@ export type ContractAdjustmentInput = {
   value?: number | null
   start_date?: string | null
   status?: ContractAdjustment['status']
+  cancellation_date?: string | null
   cancellation_deduction?: number | null
   notes?: string | null
 }
@@ -49,6 +50,7 @@ export type ContractAdjustmentUpdate = {
   start_date?: string | null
   closed_by?: string
   status?: ContractAdjustment['status']
+  cancellation_date?: string | null
   cancellation_deduction?: number | null
   notes?: string | null
 }

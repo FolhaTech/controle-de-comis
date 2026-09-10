@@ -323,7 +323,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
                 ? startDate.toISOString()
                 : null,
             end_date_planned: r.end_date_planned ?? null,
-            cancellation_date: null,
+            cancellation_date: edit?.cancellation_date ?? null,
             cancellation_reason: null,
             cancellation_deduction: edit?.cancellation_deduction != null ? Number(edit.cancellation_deduction) : null,
             internal_failure: r.internal_failure ?? null,
@@ -370,7 +370,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             status: adj.status || 'Ativo',
             start_date: adj.start_date ? new Date(adj.start_date).toISOString() : null,
             end_date_planned: null,
-            cancellation_date: null,
+            cancellation_date: adj.cancellation_date ?? null,
             cancellation_reason: null,
             cancellation_deduction: adj.cancellation_deduction != null ? Number(adj.cancellation_deduction) : null,
             internal_failure: null,

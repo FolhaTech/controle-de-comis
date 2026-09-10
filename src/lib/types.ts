@@ -47,6 +47,9 @@ export interface Contract {
   entry_value: number | null
   entry_payment_method: string | null
   is_entry_paid: boolean | null
+  // Set only via the add/edit contract form when status is 'Cancelado'
+  // (never populated from the live CRM feed itself) — the real date the
+  // cancellation happened, used for the 1-year clawback rule.
   cancellation_date: string | null
   cancellation_reason: string | null
   internal_failure: boolean | null
@@ -89,6 +92,11 @@ export interface ContractAdjustment {
   // Informational only for now — doesn't affect the commission calculation,
   // just overrides what's shown as the contract's status badge.
   status: 'Ativo' | 'Cancelado' | 'Em processo' | null
+  // Required whenever status is 'Cancelado' — when the cancellation actually
+  // happened. Drives the 1-year rule below (compared against start_date,
+  // not against today), so it can be backdated to the real cancellation
+  // date instead of whenever someone got around to updating the record.
+  cancellation_date: string | null
   // Only meaningful when status is 'Cancelado' — see Contract's field of the
   // same name. Mandatory 1-year-from-start_date rule decides whether this is
   // populated at all (see ContractAdjustmentForm); 0 means the case was

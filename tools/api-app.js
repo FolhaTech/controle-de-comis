@@ -169,7 +169,7 @@ app.get('/api/contract-adjustments', async (req, res) => {
 app.post('/api/contract-adjustments', async (req, res) => {
   let conn
   try {
-    const { action, target_processo_id, closed_by, client, case_type, value, start_date, status, cancellation_deduction, notes } = req.body || {}
+    const { action, target_processo_id, closed_by, client, case_type, value, start_date, status, cancellation_date, cancellation_deduction, notes } = req.body || {}
     if (!action || !['add', 'edit', 'remove'].includes(action)) {
       return res.status(400).json({ error: 'action must be one of add, edit, remove' })
     }
@@ -182,13 +182,16 @@ app.post('/api/contract-adjustments', async (req, res) => {
     if (action === 'add' && !(typeof notes === 'string' && notes.trim())) {
       return res.status(400).json({ error: 'notes is required when adding a contract' })
     }
+    if (status === 'Cancelado' && !cancellation_date) {
+      return res.status(400).json({ error: 'cancellation_date is required when status is Cancelado' })
+    }
 
     const id = req.body?.id || crypto.randomUUID()
     conn = await getConnection()
     await conn.execute(
-      `INSERT INTO contract_adjustments (id, action, target_processo_id, closed_by, client, case_type, value, start_date, status, cancellation_deduction, notes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [id, action, target_processo_id ?? null, closed_by, client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null, cancellation_deduction ?? null, notes ?? null],
+      `INSERT INTO contract_adjustments (id, action, target_processo_id, closed_by, client, case_type, value, start_date, status, cancellation_date, cancellation_deduction, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [id, action, target_processo_id ?? null, closed_by, client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null, cancellation_date ?? null, cancellation_deduction ?? null, notes ?? null],
     )
     const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])
     res.status(201).json({ data: rows[0] ?? null })
@@ -204,17 +207,20 @@ app.put('/api/contract-adjustments/:id', async (req, res) => {
   let conn
   try {
     const { id } = req.params
-    const { client, case_type, value, start_date, closed_by, status, cancellation_deduction, notes } = req.body || {}
+    const { client, case_type, value, start_date, closed_by, status, cancellation_date, cancellation_deduction, notes } = req.body || {}
+    if (status === 'Cancelado' && !cancellation_date) {
+      return res.status(400).json({ error: 'cancellation_date is required when status is Cancelado' })
+    }
     conn = await getConnection()
     if (closed_by) {
       await conn.execute(
-        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, closed_by = ?, status = ?, cancellation_deduction = ?, notes = ? WHERE id = ?`,
-        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, closed_by, status ?? null, cancellation_deduction ?? null, notes ?? null, id],
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, closed_by = ?, status = ?, cancellation_date = ?, cancellation_deduction = ?, notes = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, closed_by, status ?? null, cancellation_date ?? null, cancellation_deduction ?? null, notes ?? null, id],
       )
     } else {
       await conn.execute(
-        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, status = ?, cancellation_deduction = ?, notes = ? WHERE id = ?`,
-        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null, cancellation_deduction ?? null, notes ?? null, id],
+        `UPDATE contract_adjustments SET client = ?, case_type = ?, value = ?, start_date = ?, status = ?, cancellation_date = ?, cancellation_deduction = ?, notes = ? WHERE id = ?`,
+        [client ?? null, case_type ?? null, value ?? null, start_date ?? null, status ?? null, cancellation_date ?? null, cancellation_deduction ?? null, notes ?? null, id],
       )
     }
     const [rows] = await conn.execute(`SELECT * FROM contract_adjustments WHERE id = ?`, [id])

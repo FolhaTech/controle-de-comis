@@ -14,6 +14,9 @@ export interface ContractAdjustmentFormValues {
   start_date: string
   closed_by: string
   status: 'Ativo' | 'Cancelado' | 'Em processo'
+  // Required whenever status is 'Cancelado' — see the same field on
+  // Contract/ContractAdjustment in lib/types.ts.
+  cancellation_date: string
   // Only meaningful when status is 'Cancelado' — see the same field on
   // Contract/ContractAdjustment in lib/types.ts.
   cancellation_deduction: number | null
@@ -24,13 +27,16 @@ export interface ContractAdjustmentFormValues {
 
 // Mandatory rule (no manual override): a contract cancelled within 1 year of
 // its own start_date has its commission clawed back; past that, it's exempt.
-export function isWithinOneYearOfStart(startDateStr: string): boolean {
-  if (!startDateStr) return false
+// Compares against the real cancellation_date (backdatable), not whenever
+// someone happens to fill in the form.
+export function isWithinOneYearOfStart(startDateStr: string, cancellationDateStr: string): boolean {
+  if (!startDateStr || !cancellationDateStr) return false
   const start = new Date(startDateStr)
-  if (Number.isNaN(start.getTime())) return false
+  const cancelled = new Date(cancellationDateStr)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(cancelled.getTime())) return false
   const oneYearLater = new Date(start)
   oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
-  return new Date() < oneYearLater
+  return cancelled < oneYearLater
 }
 
 // The form's status select only offers these three — coerce anything else
@@ -64,6 +70,7 @@ export function ContractAdjustmentForm({
   const [startDate, setStartDate] = useState(initialValues?.start_date ?? '')
   const [closedBy, setClosedBy] = useState(initialValues?.closed_by ?? '')
   const [status, setStatus] = useState<ContractAdjustmentFormValues['status']>(initialValues?.status ?? 'Ativo')
+  const [cancellationDate, setCancellationDate] = useState(initialValues?.cancellation_date ?? '')
   const [cancellationDeduction, setCancellationDeduction] = useState(
     initialValues?.cancellation_deduction != null ? String(initialValues.cancellation_deduction) : '',
   )
@@ -73,16 +80,17 @@ export function ContractAdjustmentForm({
   const isNewContract = !initialValues
 
   const numericValue = Number(value.replace(',', '.'))
+  const isCancelled = status === 'Cancelado'
   const isValid =
     client.trim().length > 0 &&
     Number.isFinite(numericValue) &&
     numericValue >= 0 &&
     startDate.length > 0 &&
     (!consultantOptions || closedBy.length > 0) &&
-    (!isNewContract || notes.trim().length > 0)
+    (!isNewContract || notes.trim().length > 0) &&
+    (!isCancelled || cancellationDate.length > 0)
 
-  const isCancelled = status === 'Cancelado'
-  const withinOneYear = isCancelled && isWithinOneYearOfStart(startDate)
+  const withinOneYear = isCancelled && isWithinOneYearOfStart(startDate, cancellationDate)
   const numericDeduction = Number(cancellationDeduction.replace(',', '.'))
 
   const handleSubmit = async () => {
@@ -96,6 +104,7 @@ export function ContractAdjustmentForm({
         start_date: startDate,
         closed_by: closedBy,
         status,
+        cancellation_date: isCancelled ? cancellationDate : '',
         cancellation_deduction: !isCancelled
           ? null
           : !withinOneYear
@@ -170,6 +179,15 @@ export function ContractAdjustmentForm({
       </div>
       {isCancelled && (
         <div className="space-y-3 rounded-md border p-3">
+          <div className="space-y-1">
+            <Label htmlFor="adj-cancellation-date">Data do cancelamento *</Label>
+            <Input
+              id="adj-cancellation-date"
+              type="date"
+              value={cancellationDate}
+              onChange={(e) => setCancellationDate(e.target.value)}
+            />
+          </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="adj-deduct" className="cursor-default">
               Descontar valor?
@@ -177,8 +195,8 @@ export function ContractAdjustmentForm({
             <Switch id="adj-deduct" checked={withinOneYear} disabled />
           </div>
           <p className="text-xs text-muted-foreground">
-            {startDate.length === 0
-              ? 'Informe a data do contrato para calcular a regra de 1 ano.'
+            {startDate.length === 0 || cancellationDate.length === 0
+              ? 'Informe a data do contrato e a data do cancelamento para calcular a regra de 1 ano.'
               : withinOneYear
                 ? 'Cancelado dentro de 1 ano da data do contrato — o desconto é aplicado automaticamente.'
                 : 'Contrato fechado há mais de 1 ano — não será descontado.'}
