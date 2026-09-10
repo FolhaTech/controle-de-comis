@@ -169,6 +169,19 @@ export interface CommissionBreakdownItem {
   commissionValue: number
 }
 
+// A non-Trabalhista contract closed with a R$0,00 value (a fixed-fee case,
+// not billed as a percentage of value) is paid a flat premiação instead —
+// keyed by the consultant's current gatilho (the tier percentage from
+// settings.tiers, based on contract count), not by payment method: a R$0
+// contract can never trigger the high-value bonus anyway, so there's no
+// payment-method distinction to make for it.
+const ZERO_VALUE_FLAT_FEE: Record<number, number> = {
+  2.5: 50,
+  5: 100,
+  6: 150,
+  10: 200,
+}
+
 // Trabalhista contracts are never billed as a percentage of value — they're
 // charged per-contract via calculateAttendantCommission's tiers instead, so
 // they're excluded here entirely (see calculatePersonMonthlyCommission).
@@ -181,6 +194,11 @@ export function calculateCommissionBreakdown(contracts: Contract[], settings: Se
 
   const items: CommissionBreakdownItem[] = validContracts.map((contract) => {
     const value = contractValue(contract)
+    if (value === 0) {
+      const flatFee = ZERO_VALUE_FLAT_FEE[basePercentage] ?? 0
+      return { contract, percentage: basePercentage, commissionValue: flatFee }
+    }
+
     const isHighValue = value >= settings.bonuses.highValueThreshold
 
     let contractBonusPct = 0
@@ -194,10 +212,10 @@ export function calculateCommissionBreakdown(contracts: Contract[], settings: Se
     return { contract, percentage, commissionValue: value * (percentage / 100) }
   })
 
-  const baseCommission = items.reduce(
-    (sum, i) => sum + contractValue(i.contract) * (basePercentage / 100),
-    0,
-  )
+  const baseCommission = items.reduce((sum, i) => {
+    const value = contractValue(i.contract)
+    return sum + (value === 0 ? i.commissionValue : value * (basePercentage / 100))
+  }, 0)
   const total = items.reduce((sum, i) => sum + i.commissionValue, 0)
 
   return { basePercentage, items, baseCommission, bonusValue: total - baseCommission, total }
