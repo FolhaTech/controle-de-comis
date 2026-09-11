@@ -5,6 +5,7 @@ import {
   cancellationDeductionAmount,
   contractPeriodDate,
   contractValue,
+  getActiveDeductions,
   getAjudaCusto,
   isContractValid,
 } from '@/lib/calculations'
@@ -105,6 +106,9 @@ export function PremiacaoReport({
 
   const ajudaCusto = getAjudaCusto(consultant)
   const desconto = calculateMonthlyDeduction(consultantDeductions, consultant.name, month, year)
+  // Itemized so the PDF can spell out which parcela of which deduction is
+  // being taken and when it started, not just the combined total above.
+  const activeDeductions = getActiveDeductions(consultantDeductions, consultant.name, month, year)
   const canceladosTotal = cancelledContracts.reduce((sum, c) => sum + cancellationDeductionAmount(c), 0)
   const totalNotaFiscal = totalPremiacao + ajudaCusto - canceladosTotal - desconto
 
@@ -192,7 +196,15 @@ export function PremiacaoReport({
         <SummaryRow label="Premiação" value={currency(totalPremiacao)} />
         <SummaryRow label="Ajuda de custo" value={currency(ajudaCusto)} />
         <SummaryRow label="cancelados (-)" value={currency(canceladosTotal)} />
-        {desconto > 0 && <SummaryRow label="desconto (-)" value={currency(desconto)} />}
+        {activeDeductions.map(({ deduction, installmentNumber, installmentValue }) => (
+          <SummaryRow
+            key={deduction.id}
+            label={`desconto (-) ${deduction.description || 'Desconto'} — Parcela ${installmentNumber}/${
+              deduction.installments > 0 ? deduction.installments : 1
+            } (início: ${MONTH_LABELS[deduction.start_month - 1]}/${deduction.start_year})`}
+            value={currency(installmentValue)}
+          />
+        ))}
         <SummaryRow label="Total Nota Fiscal" value={currency(totalNotaFiscal)} bold />
       </div>
 
@@ -488,6 +500,7 @@ function SummaryRow({
       style={{
         display: 'flex',
         justifyContent: 'space-between',
+        gap: 8,
         padding: '5px 12px',
         background: NAVY,
         color: '#fff',
@@ -495,8 +508,8 @@ function SummaryRow({
         borderTop: '1px solid rgba(255,255,255,0.15)',
       }}
     >
-      <span>{label}</span>
-      <span>{value}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      <span style={{ whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   )
 }

@@ -325,6 +325,42 @@ export function calculateMonthlyDeduction(
     }, 0)
 }
 
+export interface ActiveDeductionDetail {
+  deduction: ConsultantDeduction
+  // 1-based — "parcela 3 de 12", not the 0-based installmentIndex used
+  // internally to decide whether the deduction is active this month.
+  installmentNumber: number
+  installmentValue: number
+}
+
+// The itemized breakdown behind calculateMonthlyDeduction's sum — every
+// deduction active for personName in month/year, with which installment
+// number it is and the value of just that installment, so callers (the PDF)
+// can show which parcela is being taken and from when it started, not just
+// a single combined total.
+export function getActiveDeductions(
+  deductions: ConsultantDeduction[],
+  personName: string,
+  month: number,
+  year: number,
+): ActiveDeductionDetail[] {
+  const normalize = (v: string) => v.trim().toLowerCase()
+  const target = normalize(personName)
+  const active: ActiveDeductionDetail[] = []
+  for (const d of deductions) {
+    if (normalize(d.consultant_name) !== target) continue
+    const installmentIndex = (year - d.start_year) * 12 + (month - d.start_month)
+    const installments = d.installments > 0 ? d.installments : 1
+    if (installmentIndex < 0 || installmentIndex >= installments) continue
+    active.push({
+      deduction: d,
+      installmentNumber: installmentIndex + 1,
+      installmentValue: d.total_value / installments,
+    })
+  }
+  return active
+}
+
 // Isolates just the Trabalhista slice of a person's monthly commission — a
 // read-only breakout of what calculatePersonMonthlyCommission already computes.
 export function calculateTrabalhistaCommission(
