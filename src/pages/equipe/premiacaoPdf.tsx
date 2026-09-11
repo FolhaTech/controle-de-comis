@@ -277,14 +277,7 @@ export function PremiacaoReport({
             const isBelowStandardValue = !isTrabalhista && contractValue(c) < 3000
             return (
               <tr key={c.id} style={{ background: idx % 2 === 0 ? '#dddddd' : '#ffffff' }}>
-                <td style={cellStyle('left')}>
-                  {c.client || c.name || '—'}
-                  {c.notes && (
-                    <span style={{ display: 'block', fontSize: 9, fontStyle: 'italic', color: '#666' }}>
-                      Obs: {c.notes}
-                    </span>
-                  )}
-                </td>
+                <td style={cellStyle('left')}>{c.client || c.name || '—'}</td>
                 <td style={cellStyle('left')}>{c.case_type || c.service_type || '—'}</td>
                 <td
                   style={{
