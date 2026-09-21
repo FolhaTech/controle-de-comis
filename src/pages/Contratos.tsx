@@ -10,6 +10,7 @@ import {
   Clock,
   Calendar,
   AlertCircle,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,10 +44,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
-import { ContractForm } from './contratos/ContractForm'
+import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
+import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
+import { contractPeriodDate, contractValue as valueOf } from '@/lib/calculations'
 import { useToast } from '@/hooks/use-toast'
-import { supabase } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -63,36 +65,44 @@ const formatDate = (dateStr: string | null | undefined) => {
 }
 
 export default function Contratos() {
-  const { contracts, contractsLoading, contractsError, filter, deleteContract, fetchContracts } =
-    useAppStore()
+  const { contracts, contractsLoading, contractsError, filter, consultants, fetchContracts } = useAppStore()
+  const { saveAdd, saveEdit, removeContract } = useContractRowActions()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
   const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
+  const [contratoSearchOpen, setContratoSearchOpen] = useState(false)
+  const [contratoSearchTerm, setContratoSearchTerm] = useState('')
+
+  const consultantNames = consultants.map((c) => c.name)
 
   useEffect(() => {
     fetchContracts()
-    const channel = supabase
-      .channel('works-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'works' }, () => {
-        fetchContracts()
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [fetchContracts])
 
   const filteredContracts = (contracts ?? []).filter((c) => {
     const matchesSearch =
       (c?.client || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    if (viewMode === 'all') return matchesSearch
-    if (!c?.start_date) return false
-    const d = new Date(c.start_date)
-    return d.getMonth() + 1 === filter.month && d.getFullYear() === filter.year && matchesSearch
+    const matchesContrato = (c?.name || '')
+      .toLowerCase()
+      .includes(contratoSearchTerm.toLowerCase())
+    if (viewMode === 'all') return matchesSearch && matchesContrato
+    const d = contractPeriodDate(c)
+    if (!d) return false
+    return (
+      d.getMonth() + 1 === filter.month &&
+      d.getFullYear() === filter.year &&
+      matchesSearch &&
+      matchesContrato
+    )
   })
+
+  const periodTotalValue = filteredContracts.reduce(
+    (sum, c) => sum + valueOf(c),
+    0,
+  )
 
   const getStatusColor = (status: string | null) => {
     switch (status) {
@@ -104,6 +114,8 @@ export default function Contratos() {
         return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       case 'Revertido':
         return 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+      case 'Em processo':
+        return 'bg-warning/15 text-warning-foreground hover:bg-warning/25'
       default:
         return 'bg-gray-100 text-gray-700'
     }
@@ -118,13 +130,86 @@ export default function Contratos() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    const { error } = await deleteContract(id)
+  const handleFormSubmit = async (values: ContractAdjustmentFormValues) => {
+    const { error } = editingContract
+      ? await saveEdit(editingContract, values, editingContract.closed_by || '')
+      : await saveAdd(values, '')
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar.' })
+    } else {
+      toast({ title: editingContract ? 'Contrato atualizado' : 'Contrato criado' })
+      setIsDialogOpen(false)
+    }
+  }
+
+  const handleDelete = async (contract: Contract) => {
+    const { error } = await removeContract(contract, contract.closed_by || '')
     if (error) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.' })
     } else {
       toast({ title: 'Contrato excluído' })
     }
+  }
+
+  const escapeCsvValue = (value: string | number | null | undefined) => {
+    const str = value === null || value === undefined ? '' : String(value)
+    return /[";\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+  }
+
+  const handleExport = () => {
+    const headers = [
+      'Cliente',
+      'CPF',
+      'Telefone',
+      'Email',
+      'Contrato',
+      'Valor Total',
+      'Entrada',
+      'Entrada Paga',
+      'Forma de Pagamento',
+      'Método de Entrada',
+      'Parcelas',
+      'Status',
+      'Data de Início',
+    ]
+
+    const rows = filteredContracts.map((contract) => [
+      contract.client || contract.name || '',
+      contract.client_cpf || '',
+      contract.client_phone || '',
+      contract.client_email || '',
+      contract.name || '',
+      currencyFormatter.format(valueOf(contract)),
+      contract.entry_value != null && contract.entry_value > 0
+        ? currencyFormatter.format(contract.entry_value)
+        : '',
+      contract.entry_value != null && contract.entry_value > 0
+        ? contract.is_entry_paid
+          ? 'Pago'
+          : 'Pendente'
+        : '',
+      contract.payment_method || '',
+      contract.entry_payment_method || '',
+      displayInstallments(contract.installments),
+      contract.status || '',
+      formatDate(contract.start_date),
+    ])
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map(escapeCsvValue).join(';'))
+      .join('\r\n')
+
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `contratos-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast({ title: 'Exportação concluída', description: `${rows.length} contrato(s) exportado(s).` })
   }
 
   const tableHeaders = [
@@ -181,27 +266,70 @@ export default function Contratos() {
             </Button>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleOpenNew} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" /> Novo Contrato
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingContract ? 'Editar Contrato' : 'Registrar Novo Contrato'}
-              </DialogTitle>
-            </DialogHeader>
-            <ContractForm
-              contract={editingContract}
-              onSuccess={() => {
-                setIsDialogOpen(false)
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={filteredContracts.length === 0}
+            className="w-full sm:w-auto"
+          >
+            <Download className="mr-2 h-4 w-4" /> Exportar
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleOpenNew} className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" /> Novo Contrato
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingContract ? 'Editar Contrato' : 'Registrar Novo Contrato'}
+                </DialogTitle>
+              </DialogHeader>
+              <ContractAdjustmentForm
+                consultantOptions={consultantNames}
+                initialValues={
+                  editingContract
+                    ? {
+                        client: editingContract.client || editingContract.name || '',
+                        case_type: editingContract.case_type || '',
+                        value: valueOf(editingContract),
+                        start_date: editingContract.start_date ? editingContract.start_date.slice(0, 10) : '',
+                        closed_by: editingContract.closed_by || '',
+                        status: toEditableStatus(editingContract.status),
+                        cancellation_date: editingContract.cancellation_date
+                          ? editingContract.cancellation_date.slice(0, 10)
+                          : '',
+                        cancellation_deduction: editingContract.cancellation_deduction,
+                        notes: editingContract.notes || '',
+                      }
+                    : undefined
+                }
+                onSubmit={handleFormSubmit}
+                onCancel={() => setIsDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {viewMode === 'period' && !contractsLoading && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-primary/5 border border-primary/20 rounded-xl p-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Valor fechado em {String(filter.month).padStart(2, '0')}/{filter.year}
+            </p>
+            <p className="text-2xl font-bold text-primary">
+              {currencyFormatter.format(periodTotalValue)}
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {filteredContracts.length}{' '}
+            {filteredContracts.length === 1 ? 'contrato fechado' : 'contratos fechados'}
+          </p>
+        </div>
+      )}
 
       {contractsError && (
         <div className="flex items-center gap-2 bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20 animate-fade-in-down">
@@ -216,7 +344,30 @@ export default function Contratos() {
             <TableRow className="bg-secondary/40">
               {tableHeaders.map((header, i) => (
                 <TableHead key={header} className={hiddenClasses[i]}>
-                  {header}
+                  {header === 'Contrato' ? (
+                    <div className="flex items-center gap-1">
+                      <span>{header}</span>
+                      <button
+                        type="button"
+                        onClick={() => setContratoSearchOpen((open) => !open)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Buscar por contrato"
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                      </button>
+                      {contratoSearchOpen && (
+                        <Input
+                          autoFocus
+                          value={contratoSearchTerm}
+                          onChange={(e) => setContratoSearchTerm(e.target.value)}
+                          placeholder="Localizar..."
+                          className="h-7 w-32 text-xs font-normal"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    header
+                  )}
                 </TableHead>
               ))}
               <TableHead className="text-right">Ações</TableHead>
@@ -250,6 +401,14 @@ export default function Contratos() {
                         <span className="text-[10px] block text-muted-foreground">
                           {contract.client_cpf || ''}
                         </span>
+                        {contract.notes && (
+                          <span
+                            className="text-[10px] block text-muted-foreground italic truncate max-w-[220px]"
+                            title={contract.notes}
+                          >
+                            Obs: {contract.notes}
+                          </span>
+                        )}
                       </div>
                       {(contract.client_phone || contract.client_email) && (
                         <Tooltip>
@@ -282,7 +441,7 @@ export default function Contratos() {
                     {contract.name || '—'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap font-medium">
-                    {currencyFormatter.format(contract.contracted_value || 0)}
+                    {currencyFormatter.format(valueOf(contract))}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell whitespace-nowrap">
                     <div className="flex flex-col gap-0.5">
@@ -364,7 +523,7 @@ export default function Contratos() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDelete(contract.id)}
+                              onClick={() => handleDelete(contract)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Excluir

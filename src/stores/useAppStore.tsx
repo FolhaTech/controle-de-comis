@@ -1,23 +1,37 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { Contract, Consultant, Settings, FilterContext, ActionType } from '@/lib/types'
+import {
+  Contract,
+  Consultant,
+  Settings,
+  FilterContext,
+  ActionType,
+  ContractAdjustment,
+  ConsultantDeduction,
+} from '@/lib/types'
 import {
   fetchTeamMembers,
   createTeamMember,
   updateTeamMember,
   deleteTeamMember,
 } from '@/services/team-members'
+import { fetchContracts } from '@/services/contracts'
 import {
-  fetchContracts,
-  createContract,
-  updateContract,
-  deleteContract,
-} from '@/services/contracts'
+  fetchContractAdjustments,
+  createContractAdjustment,
+  updateContractAdjustment,
+  deleteContractAdjustment,
+  type ContractAdjustmentInput,
+  type ContractAdjustmentUpdate,
+} from '@/services/contract-adjustments'
 import {
-  fetchActionTypes,
-  createActionType,
-  updateActionType,
-  deleteActionType,
-} from '@/services/action-types'
+  fetchConsultantDeductions,
+  createConsultantDeduction,
+  updateConsultantDeduction,
+  deleteConsultantDeduction,
+  type ConsultantDeductionInput,
+  type ConsultantDeductionUpdate,
+} from '@/services/consultant-deductions'
+import { fetchActionTypes, createActionType } from '@/services/action-types'
 
 const defaultSettings: Settings = {
   goals: {
@@ -35,9 +49,8 @@ const defaultSettings: Settings = {
   ],
   bonuses: {
     highValueThreshold: 3000,
-    highValuePercentage: 1.0,
-    maxInstallments: 12,
-    installmentsPercentage: 2.0,
+    creditCardBonusPercentage: 1.0,
+    cashBonusPercentage: 2.0,
   },
   quarterTiers: [
     { contracts: 105, award: 1250 },
@@ -45,14 +58,25 @@ const defaultSettings: Settings = {
     { contracts: 150, award: 2500 },
   ],
   ipca: { year: 2025, value: 4.83, appliedPercentage: 70 },
+  attendantCommission: {
+    baseAllowance: 2000,
+    tiers: [
+      { min: 0, max: 9, valuePerContract: 0 },
+      { min: 10, max: 35, valuePerContract: 25 },
+      { min: 36, max: 49, valuePerContract: 50 },
+      { min: 50, max: null, valuePerContract: 60 },
+    ],
+  },
 }
 
 interface AppStoreState {
   contracts: Contract[]
   contractsLoading: boolean
   contractsError: string | null
+  contractAdjustments: ContractAdjustment[]
   consultants: Consultant[]
   consultantsLoading: boolean
+  consultantDeductions: ConsultantDeduction[]
   actionTypes: ActionType[]
   actionTypesLoading: boolean
   settings: Settings
@@ -61,9 +85,12 @@ interface AppStoreState {
   fetchConsultants: () => Promise<{ error: unknown }>
   fetchContracts: () => Promise<void>
   fetchActionTypes: () => Promise<void>
-  addContract: (contract: Partial<Contract>) => Promise<{ error: unknown }>
-  updateContract: (id: string, updates: Partial<Contract>) => Promise<{ error: unknown }>
-  deleteContract: (id: string) => Promise<{ error: unknown }>
+  addContractAdjustment: (input: ContractAdjustmentInput) => Promise<{ error: unknown }>
+  updateContractAdjustment: (id: string, updates: ContractAdjustmentUpdate) => Promise<{ error: unknown }>
+  deleteContractAdjustment: (id: string) => Promise<{ error: unknown }>
+  addConsultantDeduction: (input: ConsultantDeductionInput) => Promise<{ error: unknown }>
+  updateConsultantDeduction: (id: string, updates: ConsultantDeductionUpdate) => Promise<{ error: unknown }>
+  deleteConsultantDeduction: (id: string) => Promise<{ error: unknown }>
   addConsultant: (member: Partial<Consultant>) => Promise<{ error: unknown }>
   updateConsultant: (id: string, updates: Partial<Consultant>) => Promise<{ error: unknown }>
   deleteConsultant: (id: string) => Promise<{ error: unknown }>
@@ -80,8 +107,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [contractsLoading, setContractsLoading] = useState(false)
   const [contractsError, setContractsError] = useState<string | null>(null)
+  const [contractAdjustments, setContractAdjustments] = useState<ContractAdjustment[]>([])
   const [consultants, setConsultants] = useState<Consultant[]>([])
   const [consultantsLoading, setConsultantsLoading] = useState(false)
+  const [consultantDeductions, setConsultantDeductions] = useState<ConsultantDeduction[]>([])
   const [actionTypes, setActionTypes] = useState<ActionType[]>([])
   const [actionTypesLoading, setActionTypesLoading] = useState(false)
   const [settings, setSettings] = useState<Settings>(defaultSettings)
@@ -92,8 +121,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchConsultants = useCallback(async () => {
     setConsultantsLoading(true)
-    const { data, error } = await fetchTeamMembers()
+    const [{ data, error }, { data: deductions }] = await Promise.all([
+      fetchTeamMembers(),
+      fetchConsultantDeductions(),
+    ])
     if (!error && data) setConsultants(data)
+    if (deductions) setConsultantDeductions(deductions)
     setConsultantsLoading(false)
     return { error }
   }, [])
@@ -101,11 +134,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fetchContractsAction = useCallback(async () => {
     setContractsLoading(true)
     setContractsError(null)
-    const { data, error } = await fetchContracts()
+    const [{ data, error }, { data: adjustments }] = await Promise.all([
+      fetchContracts(),
+      fetchContractAdjustments(),
+    ])
     if (error) {
       setContractsError('Não foi possível carregar os contratos. Verifique sua conexão.')
     }
     if (!error && data) setContracts(data)
+    if (adjustments) setContractAdjustments(adjustments)
     setContractsLoading(false)
   }, [])
 
@@ -120,23 +157,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await Promise.all([fetchContractsAction(), fetchConsultants(), fetchActionTypesAction()])
   }, [fetchContractsAction, fetchConsultants, fetchActionTypesAction])
 
-  const addContract = useCallback(async (contract: Partial<Contract>) => {
-    const { data, error } = await createContract(contract)
-    if (!error && data) setContracts((prev) => [data, ...prev])
+  // These three mutate the manual add/edit/remove overlay applied on top of
+  // the live CRM contracts (see fetchContracts) — after any of them succeed,
+  // refetch so the merged contract list picks up the change immediately.
+  const addContractAdjustmentAction = useCallback(async (input: ContractAdjustmentInput) => {
+    const { error } = await createContractAdjustment(input)
+    if (!error) await fetchContractsAction()
     return { error }
-  }, [])
+  }, [fetchContractsAction])
 
-  const updateContractRow = useCallback(async (id: string, updates: Partial<Contract>) => {
-    const { data, error } = await updateContract(id, updates)
-    if (!error && data) setContracts((prev) => prev.map((c) => (c.id === id ? data : c)))
+  const updateContractAdjustmentAction = useCallback(async (id: string, updates: ContractAdjustmentUpdate) => {
+    const { error } = await updateContractAdjustment(id, updates)
+    if (!error) await fetchContractsAction()
     return { error }
-  }, [])
+  }, [fetchContractsAction])
 
-  const deleteContractRow = useCallback(async (id: string) => {
-    const { error } = await deleteContract(id)
-    if (!error) setContracts((prev) => prev.filter((c) => c.id !== id))
+  const deleteContractAdjustmentAction = useCallback(async (id: string) => {
+    const { error } = await deleteContractAdjustment(id)
+    if (!error) await fetchContractsAction()
     return { error }
-  }, [])
+  }, [fetchContractsAction])
+
+  // Same shape as the contract adjustment actions above — refetch after any
+  // mutation so "Remuneração + Ajuda de Custo" reflects the change right away.
+  const addConsultantDeductionAction = useCallback(async (input: ConsultantDeductionInput) => {
+    const { error } = await createConsultantDeduction(input)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
+
+  const updateConsultantDeductionAction = useCallback(async (id: string, updates: ConsultantDeductionUpdate) => {
+    const { error } = await updateConsultantDeduction(id, updates)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
+
+  const deleteConsultantDeductionAction = useCallback(async (id: string) => {
+    const { error } = await deleteConsultantDeduction(id)
+    if (!error) await fetchConsultants()
+    return { error }
+  }, [fetchConsultants])
 
   const addConsultant = useCallback(async (member: Partial<Consultant>) => {
     const { data, error } = await createTeamMember(member)
@@ -188,8 +248,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         contracts,
         contractsLoading,
         contractsError,
+        contractAdjustments,
         consultants,
         consultantsLoading,
+        consultantDeductions,
         actionTypes,
         actionTypesLoading,
         settings,
@@ -198,9 +260,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchConsultants,
         fetchContracts: fetchContractsAction,
         fetchActionTypes: fetchActionTypesAction,
-        addContract,
-        updateContract: updateContractRow,
-        deleteContract: deleteContractRow,
+        addContractAdjustment: addContractAdjustmentAction,
+        updateContractAdjustment: updateContractAdjustmentAction,
+        deleteContractAdjustment: deleteContractAdjustmentAction,
+        addConsultantDeduction: addConsultantDeductionAction,
+        updateConsultantDeduction: updateConsultantDeductionAction,
+        deleteConsultantDeduction: deleteConsultantDeductionAction,
         addConsultant,
         updateConsultant,
         deleteConsultant,

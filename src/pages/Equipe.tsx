@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Plus, Pencil, Trash2, Users, AlertCircle, FileDown, Wallet } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,9 +31,24 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
+import {
+  calculatePersonMonthlyCommission,
+  calculateMonthlyDeduction,
+  calculateCancelamentosDeduction,
+  getAjudaCusto,
+} from '@/lib/calculations'
 import { ConsultantForm } from './equipe/ConsultantForm'
+import { MonthlyValuesTable } from './equipe/MonthlyValuesTable'
+import { CommissionMonthlyTable } from './equipe/CommissionMonthlyTable'
+import { AttendantCommissionTable } from './equipe/AttendantCommissionTable'
+import {
+  ConsultantContractsDialog,
+  type ContractsPeriod,
+} from './equipe/ConsultantContractsDialog'
+import { ConsultantDeductionsDialog } from './equipe/ConsultantDeductionsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
+import { PremiacaoReport } from './equipe/premiacaoPdf'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -40,6 +56,21 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 })
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR')
+
+const MONTHS = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
 
 function formatPaymentType(type: string | null): string {
   switch (type) {
@@ -75,12 +106,42 @@ function formatType(type: string | null): string {
 }
 
 export default function Equipe() {
-  const { consultants, consultantsLoading, fetchConsultants, deleteConsultant } = useAppStore()
+  const {
+    consultants,
+    consultantsLoading,
+    fetchConsultants,
+    deleteConsultant,
+    contracts,
+    contractsLoading,
+    consultantDeductions,
+    settings,
+    filter,
+  } = useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [viewingContractsFor, setViewingContractsFor] = useState<Consultant | null>(null)
+  const [viewingPeriod, setViewingPeriod] = useState<ContractsPeriod>('all')
+  const [viewingDeductionsFor, setViewingDeductionsFor] = useState<Consultant | null>(null)
+  const [valuesYear, setValuesYear] = useState(new Date().getFullYear())
+  const [printTargets, setPrintTargets] = useState<Consultant[] | null>(null)
   const { toast } = useToast()
+
+  // Print the mounted #premiacao-print-root (see main.css) once its content
+  // has actually painted, then clear it once the browser's print dialog
+  // closes — whether the user saved a PDF or cancelled.
+  useEffect(() => {
+    if (!printTargets) return
+    const timer = setTimeout(() => window.print(), 80)
+    return () => clearTimeout(timer)
+  }, [printTargets])
+
+  useEffect(() => {
+    const handleAfterPrint = () => setPrintTargets(null)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => window.removeEventListener('afterprint', handleAfterPrint)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -126,6 +187,13 @@ export default function Equipe() {
     setDeleteTarget(null)
   }
 
+  const handlePrintOne = (consultant: Consultant) => setPrintTargets([consultant])
+
+  const handlePrintAll = () => {
+    if (consultants.length === 0) return
+    setPrintTargets(consultants)
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -133,24 +201,35 @@ export default function Equipe() {
           <h2 className="text-2xl font-serif font-bold">Equipe Comercial</h2>
           <p className="text-muted-foreground">Gerencie os consultores e seus acessos.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleOpenNew} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" /> Novo Membro
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
-              </DialogTitle>
-            </DialogHeader>
-            <ConsultantForm
-              consultant={editingConsultant}
-              onSuccess={() => setIsDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={handlePrintAll}
+            disabled={consultantsLoading || consultants.length === 0}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            {`Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleOpenNew} className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" /> Novo Membro
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
+                </DialogTitle>
+              </DialogHeader>
+              <ConsultantForm
+                consultant={editingConsultant}
+                onSuccess={() => setIsDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-subtle border overflow-hidden">
@@ -163,10 +242,12 @@ export default function Equipe() {
               <TableHead className="hidden lg:table-cell">Tipo</TableHead>
               <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
               <TableHead>Remuneração</TableHead>
+              <TableHead>Remuneração + Ajuda de Custo</TableHead>
               <TableHead className="hidden xl:table-cell">Telefone</TableHead>
               <TableHead className="hidden xl:table-cell">PIX</TableHead>
               <TableHead className="hidden lg:table-cell">Admissão</TableHead>
               <TableHead className="hidden xl:table-cell">Projeto</TableHead>
+              <TableHead>Contratos</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -192,6 +273,9 @@ export default function Equipe() {
                   <TableCell>
                     <Skeleton className="h-5 w-24" />
                   </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
                   <TableCell className="hidden xl:table-cell">
                     <Skeleton className="h-5 w-28" />
                   </TableCell>
@@ -204,6 +288,9 @@ export default function Equipe() {
                   <TableCell className="hidden xl:table-cell">
                     <Skeleton className="h-5 w-24" />
                   </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-8 w-32" />
+                  </TableCell>
                   <TableCell className="text-right">
                     <Skeleton className="h-8 w-16 ml-auto" />
                   </TableCell>
@@ -211,7 +298,7 @@ export default function Equipe() {
               ))
             ) : consultants.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12">
+                <TableCell colSpan={13} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Users className="h-10 w-10 opacity-40" />
                     <p className="font-medium">Nenhum membro da equipe encontrado</p>
@@ -224,6 +311,27 @@ export default function Equipe() {
             ) : (
               consultants.map((consultant) => {
                 const statusInfo = formatStatus(consultant.status)
+                const remuneracao = calculatePersonMonthlyCommission(
+                  contracts,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                  settings,
+                ).total
+                const monthlyDeduction = calculateMonthlyDeduction(
+                  consultantDeductions,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                )
+                const cancelamentosDeduction = calculateCancelamentosDeduction(
+                  contracts,
+                  consultant.name,
+                  filter.month,
+                  filter.year,
+                )
+                const remuneracaoComAjuda =
+                  remuneracao + getAjudaCusto(consultant) - monthlyDeduction - cancelamentosDeduction
                 return (
                   <TableRow key={consultant.id} className="hover:bg-secondary/20 transition-colors">
                     <TableCell className="font-medium">{consultant.name}</TableCell>
@@ -250,9 +358,20 @@ export default function Equipe() {
                       {formatPaymentType(consultant.payment_type)}
                     </TableCell>
                     <TableCell className="text-sm font-medium">
-                      {consultant.payment_type === 'monthly' || consultant.fixed_salary
-                        ? currencyFormatter.format(consultant.fixed_salary || 0)
-                        : currencyFormatter.format(consultant.daily_cost || 0)}
+                      {currencyFormatter.format(remuneracao)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {currencyFormatter.format(remuneracaoComAjuda)}
+                      {monthlyDeduction > 0 && (
+                        <span className="block text-[10px] font-normal text-destructive">
+                          -{currencyFormatter.format(monthlyDeduction)} desconto
+                        </span>
+                      )}
+                      {cancelamentosDeduction > 0 && (
+                        <span className="block text-[10px] font-normal text-destructive">
+                          -{currencyFormatter.format(cancelamentosDeduction)} cancelados
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.phone || '—'}
@@ -268,8 +387,47 @@ export default function Equipe() {
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                       {consultant.work_name || '—'}
                     </TableCell>
+                    <TableCell>
+                      <Select
+                        onValueChange={(value) => {
+                          setViewingContractsFor(consultant)
+                          setViewingPeriod(value as ContractsPeriod)
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[150px] text-xs">
+                          <SelectValue placeholder="Ver contratos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os períodos</SelectItem>
+                          {MONTHS.map((m, i) => (
+                            <SelectItem key={i} value={`${i + 1}-${filter.year}`}>
+                              {m}/{filter.year}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">Período personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Extrair PDF"
+                          onClick={() => handlePrintOne(consultant)}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Descontos"
+                          onClick={() => setViewingDeductionsFor(consultant)}
+                        >
+                          <Wallet className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -311,6 +469,33 @@ export default function Equipe() {
         </Card>
       )}
 
+      <AttendantCommissionTable
+        consultants={consultants}
+        contracts={contracts}
+        settings={settings}
+        month={filter.month}
+        year={filter.year}
+        loading={consultantsLoading || contractsLoading}
+      />
+
+      <MonthlyValuesTable
+        consultants={consultants}
+        contracts={contracts}
+        settings={settings}
+        year={valuesYear}
+        onYearChange={setValuesYear}
+        loading={consultantsLoading || contractsLoading}
+      />
+
+      <CommissionMonthlyTable
+        consultants={consultants}
+        contracts={contracts}
+        settings={settings}
+        month={filter.month}
+        year={filter.year}
+        loading={consultantsLoading || contractsLoading}
+      />
+
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -340,6 +525,47 @@ export default function Equipe() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConsultantContractsDialog
+        consultant={viewingContractsFor}
+        contracts={contracts}
+        settings={settings}
+        open={!!viewingContractsFor}
+        onOpenChange={(open) => {
+          if (!open) setViewingContractsFor(null)
+        }}
+        initialPeriod={viewingPeriod}
+        year={filter.year}
+      />
+
+      <ConsultantDeductionsDialog
+        consultant={viewingDeductionsFor}
+        deductions={consultantDeductions}
+        open={!!viewingDeductionsFor}
+        onOpenChange={(open) => {
+          if (!open) setViewingDeductionsFor(null)
+        }}
+      />
+
+      {/* Only visible while printing (see the @media print rule in main.css) —
+          holds one or several Premiação reports for window.print() to turn
+          into a PDF via the browser's own "Salvar como PDF" print target. */}
+      {printTargets && (
+        <div id="premiacao-print-root">
+          {printTargets.map((consultant, index) => (
+            <PremiacaoReport
+              key={consultant.id}
+              consultant={consultant}
+              contracts={contracts}
+              consultantDeductions={consultantDeductions}
+              settings={settings}
+              month={filter.month}
+              year={filter.year}
+              pageBreakAfter={index < printTargets.length - 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

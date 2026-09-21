@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { supabase } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   FileText,
@@ -36,23 +35,14 @@ export function Sidebar({ className }: { className?: string }) {
 
   useEffect(() => {
     if (user) {
-      supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setProfileName(data.full_name || 'Usuário')
-            setProfileRole(data.role || '')
-          }
-        })
+      setProfileName(user.full_name || 'Usuário')
+      setProfileRole(user.role || '')
     }
   }, [user])
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   const NavContent = () => (

@@ -30,6 +30,7 @@ const formSchema = z
     role: z.string().min(1, 'Cargo obrigatório'),
     phone: z.string().optional(),
     pix_key: z.string().optional(),
+    cnpj: z.string().optional(),
     payment_type: z.string().default('daily'),
     fixed_salary: z.coerce.number().min(0, 'Valor inválido'),
     is_attendant: z.boolean().default(false),
@@ -60,6 +61,7 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
           role: consultant.role || '',
           phone: consultant.phone || '',
           pix_key: consultant.pix_key || '',
+          cnpj: consultant.cnpj || '',
           payment_type: consultant.payment_type || 'daily',
           fixed_salary: consultant.fixed_salary || 0,
           is_attendant: consultant.type === 'atendente',
@@ -72,6 +74,7 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
           role: '',
           phone: '',
           pix_key: '',
+          cnpj: '',
           payment_type: 'daily',
           fixed_salary: 0,
           is_attendant: false,
@@ -170,6 +173,20 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="cnpj"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>CNPJ (para a Nota Fiscal / PDF de premiação)</FormLabel>
+              <FormControl>
+                <Input placeholder="00.000.000/0000-00" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
