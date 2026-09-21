@@ -1,9 +1,9 @@
 {
   "_versions": {
-    "parse-receipt": 4,
-    "generate-composition": 2,
-    "create-user": 1,
-    "delete-user": 1,
-    "processos": 2
+    "parse-receipt": 5,
+    "generate-composition": 3,
+    "create-user": 2,
+    "delete-user": 2,
+    "processos": 3
   }
 }
