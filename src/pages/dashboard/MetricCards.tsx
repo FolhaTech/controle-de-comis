@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FileCheck, DollarSign, Users, TrendingUp } from 'lucide-react'
+import { FileCheck, DollarSign, Users, Wallet } from 'lucide-react'
 
 interface MetricCardsProps {
   activeContracts: number
   totalContractedValue: number
   teamSize: number
-  avgProgress: number
+  remuneracaoTotal: number
   loading?: boolean
 }
 
@@ -14,7 +14,7 @@ export function MetricCards({
   activeContracts,
   totalContractedValue,
   teamSize,
-  avgProgress,
+  remuneracaoTotal,
   loading = false,
 }: MetricCardsProps) {
   const formatCurrency = (val: number) =>
@@ -73,12 +73,12 @@ export function MetricCards({
       </Card>
       <Card className="hover:shadow-md transition-shadow bg-primary/5 border-primary/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-primary">Progresso Médio</CardTitle>
-          <TrendingUp className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium text-primary">Remuneração Total</CardTitle>
+          <Wallet className="h-4 w-4 text-primary" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-primary">{avgProgress.toFixed(1)}%</div>
-          <p className="text-xs text-primary/70 mt-1">Média de andamento</p>
+          <div className="text-2xl font-bold text-primary">{formatCurrency(remuneracaoTotal)}</div>
+          <p className="text-xs text-primary/70 mt-1">Comissão da equipe no período</p>
         </CardContent>
       </Card>
     </div>

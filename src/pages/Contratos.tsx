@@ -47,7 +47,11 @@ import useAppStore from '@/stores/useAppStore'
 import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
 import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
-import { contractPeriodDate, contractValue as valueOf } from '@/lib/calculations'
+import {
+  cancellationDeductionAmount,
+  contractPeriodDate,
+  contractValue as valueOf,
+} from '@/lib/calculations'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
@@ -72,6 +76,7 @@ export default function Contratos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | undefined>(undefined)
   const [viewMode, setViewMode] = useState<'all' | 'period'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all')
   const [contratoSearchOpen, setContratoSearchOpen] = useState(false)
   const [contratoSearchTerm, setContratoSearchTerm] = useState('')
 
@@ -88,6 +93,10 @@ export default function Contratos() {
     const matchesContrato = (c?.name || '')
       .toLowerCase()
       .includes(contratoSearchTerm.toLowerCase())
+    const isCancelled = c?.status === 'Cancelado'
+    const matchesStatus =
+      statusFilter === 'all' || (statusFilter === 'cancelled' ? isCancelled : !isCancelled)
+    if (!matchesStatus) return false
     if (viewMode === 'all') return matchesSearch && matchesContrato
     const d = contractPeriodDate(c)
     if (!d) return false
@@ -264,6 +273,24 @@ export default function Contratos() {
               <Calendar className="h-4 w-4 mr-1" />
               {String(filter.month).padStart(2, '0')}/{filter.year}
             </Button>
+          </div>
+          <div className="flex gap-2">
+            {(
+              [
+                { value: 'all', label: 'Todos status' },
+                { value: 'active', label: 'Ativos' },
+                { value: 'cancelled', label: 'Cancelados' },
+              ] as const
+            ).map((option) => (
+              <Button
+                key={option.value}
+                size="sm"
+                variant={statusFilter === option.value ? 'default' : 'outline'}
+                onClick={() => setStatusFilter(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -486,6 +513,15 @@ export default function Contratos() {
                     {contract.status === 'Cancelado' && contract.internal_failure && (
                       <span className="text-[10px] block text-muted-foreground mt-1">
                         Falha Interna
+                      </span>
+                    )}
+                    {contract.status === 'Cancelado' && !contract.internal_failure && (
+                      <span className="text-[10px] block text-destructive mt-1">
+                        {!contract.closed_by
+                          ? 'Sem consultor · não desconta'
+                          : cancellationDeductionAmount(contract) > 0
+                            ? `Desconta ${currencyFormatter.format(cancellationDeductionAmount(contract))} de ${contract.closed_by}`
+                            : `Sem desconto · ${contract.closed_by}`}
                       </span>
                     )}
                   </TableCell>

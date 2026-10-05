@@ -147,6 +147,32 @@ function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknow
   return paymentDate
 }
 
+function apiBases(): string[] {
+  const bases = [
+    (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
+    'http://localhost:4000',
+    'http://localhost:4001',
+    'http://localhost:4002',
+  ].filter(Boolean) as string[]
+  bases.push('') // same-origin fallback, e.g. Vercel's /api/*
+  return bases
+}
+
+async function fetchCancelledRows(): Promise<Record<string, any>[]> {
+  let lastError: unknown
+  for (const API_BASE of apiBases()) {
+    try {
+      const res = await fetch(`${API_BASE}/api/contratos-cancelados`)
+      if (!res.ok) throw new Error(`API error ${res.status}`)
+      const body = await res.json()
+      return body?.data ?? []
+    } catch (err) {
+      lastError = err
+    }
+  }
+  throw lastError ?? new Error('API unavailable')
+}
+
 export async function fetchContracts(): Promise<{ data: Contract[] | null; error: any }> {
   // Helper to deduplicate contracts by id or composite key
   const uniqueContracts = (items: Contract[]) => {
@@ -160,16 +186,8 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
 
   // Try to fetch from backend view first
   try {
-    const API_BASES = [
-      (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
-      'http://localhost:4000',
-      'http://localhost:4001',
-      'http://localhost:4002',
-    ].filter(Boolean) as string[]
-    API_BASES.push('') // same-origin fallback, e.g. Vercel's /api/*
-
     let lastError: unknown
-    for (const API_BASE of API_BASES) {
+    for (const API_BASE of apiBases()) {
       try {
         const url = `${API_BASE}/api/vw_formas_pagamentos`
         const res = await fetch(url)
@@ -382,6 +400,55 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             progress_percentage: null,
             total_area: null,
             closed_by: adj.closed_by,
+          })
+        }
+
+        // Cancelled contracts come from vw_contratos_cancelados. The view has no
+        // value, consultant or start date, so those come from a manual edit (see
+        // ContractAdjustmentForm) when someone has filled them in.
+        const cancelledRows = await fetchCancelledRows().catch(() => [] as Record<string, any>[])
+        for (const r of cancelledRows) {
+          const processId = String(r.processo_id ?? '')
+          if (!processId || removedProcessIds.has(processId)) continue
+          const edit = editsByProcessId.get(processId)
+          const value = edit?.value != null ? Number(edit.value) : parseNumericValue(r.valor)
+          const cancelledAt = edit?.cancellation_date ?? r.data_cancelamento ?? null
+          const cancelledDate = cancelledAt ? new Date(cancelledAt) : null
+          const startDate = edit?.start_date ? new Date(edit.start_date) : null
+          contracts.push({
+            id: processId,
+            name: null,
+            client: edit?.client || r.nome_cliente || null,
+            client_cpf: r.cpf_cliente ?? null,
+            client_phone: null,
+            client_email: null,
+            consultant_id: null,
+            pre_processual_agent_id: null,
+            service_type: null,
+            case_type: edit?.case_type || r.acao_cli || null,
+            contracted_value: value,
+            commission_base_value: value,
+            entry_value: null,
+            entry_payment_method: null,
+            is_entry_paid: null,
+            payment_method: null,
+            installments: null,
+            status: edit?.status || 'Cancelado',
+            start_date: startDate && !Number.isNaN(startDate.getTime()) ? startDate.toISOString() : null,
+            end_date_planned: null,
+            cancellation_date:
+              cancelledDate && !Number.isNaN(cancelledDate.getTime()) ? cancelledDate.toISOString() : null,
+            cancellation_reason: null,
+            cancellation_deduction: edit?.cancellation_deduction != null ? Number(edit.cancellation_deduction) : null,
+            internal_failure: null,
+            manager: null,
+            address: null,
+            notes: edit?.notes || null,
+            created_at: null,
+            budget_planned: null,
+            progress_percentage: null,
+            total_area: null,
+            closed_by: edit?.closed_by || r.nome_solicitante || null,
           })
         }
 
