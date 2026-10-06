@@ -518,7 +518,10 @@ app.put('/api/consultant-emails', async (req, res) => {
 // Triggered by Vercel Cron (see vercel.json); the month defaults to the previous one
 // in Brasília time and can be overridden with ?month=&year= for a manual run.
 async function sendPremiacao(req, res) {
-  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET) {
+    return res.status(500).json({ error: 'CRON_SECRET não está configurado na Vercel' })
+  }
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' })
   }
   const copyTo = (process.env.PREMIACAO_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
