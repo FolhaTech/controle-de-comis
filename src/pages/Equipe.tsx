@@ -34,7 +34,7 @@ import useAppStore from '@/stores/useAppStore'
 import {
   calculatePersonMonthlyCommission,
   calculateMonthlyDeduction,
-  calculateCancelamentosDeduction,
+  getCancelamentosDeductions,
   getAjudaCusto,
 } from '@/lib/calculations'
 import { ConsultantForm } from './equipe/ConsultantForm'
@@ -243,6 +243,7 @@ export default function Equipe() {
               <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
               <TableHead>Remuneração</TableHead>
               <TableHead>Remuneração + Ajuda de Custo</TableHead>
+              <TableHead>Cancelados</TableHead>
               <TableHead className="hidden xl:table-cell">Telefone</TableHead>
               <TableHead className="hidden xl:table-cell">PIX</TableHead>
               <TableHead className="hidden lg:table-cell">Admissão</TableHead>
@@ -276,6 +277,9 @@ export default function Equipe() {
                   <TableCell>
                     <Skeleton className="h-5 w-24" />
                   </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
                   <TableCell className="hidden xl:table-cell">
                     <Skeleton className="h-5 w-28" />
                   </TableCell>
@@ -298,7 +302,7 @@ export default function Equipe() {
               ))
             ) : consultants.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-12">
+                <TableCell colSpan={14} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Users className="h-10 w-10 opacity-40" />
                     <p className="font-medium">Nenhum membro da equipe encontrado</p>
@@ -324,12 +328,13 @@ export default function Equipe() {
                   filter.month,
                   filter.year,
                 )
-                const cancelamentosDeduction = calculateCancelamentosDeduction(
+                const cancelamentos = getCancelamentosDeductions(
                   contracts,
                   consultant.name,
                   filter.month,
                   filter.year,
                 )
+                const cancelamentosDeduction = cancelamentos.reduce((sum, item) => sum + item.amount, 0)
                 const remuneracaoComAjuda =
                   remuneracao + getAjudaCusto(consultant) - monthlyDeduction - cancelamentosDeduction
                 return (
@@ -371,6 +376,24 @@ export default function Equipe() {
                         <span className="block text-[10px] font-normal text-destructive">
                           -{currencyFormatter.format(cancelamentosDeduction)} cancelados
                         </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {cancelamentos.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          <span className="block font-medium text-destructive">
+                            {cancelamentos.length} {cancelamentos.length === 1 ? 'cancelado' : 'cancelados'} · -
+                            {currencyFormatter.format(cancelamentosDeduction)}
+                          </span>
+                          {cancelamentos.map((item) => (
+                            <span key={item.contract.id} className="block text-[10px] text-muted-foreground">
+                              {item.contract.client || item.contract.name || '—'} ·{' '}
+                              {currencyFormatter.format(item.amount)}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">

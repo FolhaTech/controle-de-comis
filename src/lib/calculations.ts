@@ -289,16 +289,33 @@ export function calculatePersonMonthlyCommission(
 // calculatePersonMonthlyCommission, but this is a further, separate
 // deduction (e.g. the value already paid out before the cancellation), so it
 // must be subtracted everywhere commission is shown, not just on the PDF.
+export interface CancelamentoDeduction {
+  contract: Contract
+  amount: number
+}
+
+export function getCancelamentosDeductions(
+  contracts: Contract[],
+  personName: string,
+  month: number,
+  year: number,
+): CancelamentoDeduction[] {
+  return filterPersonPeriodContracts(contracts, personName, month, year)
+    .filter((c) => c.status === 'Cancelado' && !c.internal_failure)
+    .map((contract) => ({ contract, amount: cancellationDeductionAmount(contract) }))
+    .filter((item) => item.amount > 0)
+}
+
 export function calculateCancelamentosDeduction(
   contracts: Contract[],
   personName: string,
   month: number,
   year: number,
 ): number {
-  const personContracts = filterPersonPeriodContracts(contracts, personName, month, year)
-  return personContracts
-    .filter((c) => c.status === 'Cancelado' && !c.internal_failure)
-    .reduce((sum, c) => sum + cancellationDeductionAmount(c), 0)
+  return getCancelamentosDeductions(contracts, personName, month, year).reduce(
+    (sum, item) => sum + item.amount,
+    0,
+  )
 }
 
 // Sum of the monthly installment of every deduction (advance, loan,
