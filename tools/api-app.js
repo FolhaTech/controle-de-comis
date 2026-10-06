@@ -147,9 +147,10 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
   }
 })
 
-// vw_contratos_cancelados only carries the process id, client identity and
-// cancellation date — consultant, case type and value are looked up from the
-// base tables when present, and come back NULL (blank in the UI) otherwise.
+// vw_contratos_cancelados: one row per cancelled processo (some repeat), with the
+// consultant who handled it (nome_consultora_atendimento) and the commission to
+// claw back (valor_comissao). case_type comes from the base tables, since the view
+// doesn't carry it.
 app.get('/api/contratos-cancelados', async (req, res) => {
   let conn
   try {
@@ -159,19 +160,12 @@ app.get('/api/contratos-cancelados', async (req, res) => {
              MAX(v.cpf_cliente) AS cpf_cliente,
              MAX(v.nome_cliente) AS nome_cliente,
              MAX(v.data_cancelamento) AS data_cancelamento,
-             (SELECT T3.nome_solicitante FROM gdp_processo_tarefa T2
-                JOIN mod_cad_clientes T3 ON T3.processo_tarefa_id = T2.id
-               WHERE T2.processo_id = v.processo_id AND T3.nome_solicitante IS NOT NULL AND T3.nome_solicitante <> ''
-               LIMIT 1) AS nome_solicitante,
+             MAX(v.nome_consultora_atendimento) AS nome_consultora_atendimento,
+             MAX(v.valor_comissao) AS valor_comissao,
              (SELECT T3.acao_cli FROM gdp_processo_tarefa T2
                 JOIN mod_cad_clientes T3 ON T3.processo_tarefa_id = T2.id
                WHERE T2.processo_id = v.processo_id AND T3.acao_cli IS NOT NULL AND T3.acao_cli <> ''
-               LIMIT 1) AS acao_cli,
-             (SELECT COALESCE(NULLIF(T4.valor_desconto_forma_pagamento, 0), T4.valor_pagto) FROM gdp_processo_tarefa T2
-                JOIN mod_cad_clientes T3 ON T3.processo_tarefa_id = T2.id
-                JOIN mod_cad_clientes_x_pagamento_cliente T4 ON T4.cad_clientes_id = T3.id
-               WHERE T2.processo_id = v.processo_id AND COALESCE(NULLIF(T4.valor_desconto_forma_pagamento, 0), T4.valor_pagto) IS NOT NULL
-               LIMIT 1) AS valor
+               LIMIT 1) AS acao_cli
       FROM vw_contratos_cancelados v
       GROUP BY v.processo_id
     `)

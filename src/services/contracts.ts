@@ -158,6 +158,13 @@ function apiBases(): string[] {
   return bases
 }
 
+function cancellationWithinOneYear(start: Date | null, cancelled: Date | null): boolean {
+  if (!start || !cancelled || Number.isNaN(start.getTime()) || Number.isNaN(cancelled.getTime())) return false
+  const oneYearLater = new Date(start)
+  oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+  return cancelled < oneYearLater
+}
+
 async function fetchCancelledRows(): Promise<Record<string, any>[]> {
   let lastError: unknown
   for (const API_BASE of apiBases()) {
@@ -403,18 +410,25 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           })
         }
 
-        // Cancelled contracts come from vw_contratos_cancelados. The view has no
-        // value, consultant or start date, so those come from a manual edit (see
-        // ContractAdjustmentForm) when someone has filled them in.
+        // Cancelled contracts come from vw_contratos_cancelados: the handling
+        // consultant is closed_by, and the clawback is valor_comissao — but only
+        // when the cancellation falls within 1 year of the contract's start date,
+        // which the view doesn't carry, so it comes from a manual edit. Without a
+        // start date the contract isn't deducted.
         const cancelledRows = await fetchCancelledRows().catch(() => [] as Record<string, any>[])
         for (const r of cancelledRows) {
           const processId = String(r.processo_id ?? '')
           if (!processId || removedProcessIds.has(processId)) continue
           const edit = editsByProcessId.get(processId)
-          const value = edit?.value != null ? Number(edit.value) : parseNumericValue(r.valor)
           const cancelledAt = edit?.cancellation_date ?? r.data_cancelamento ?? null
           const cancelledDate = cancelledAt ? new Date(cancelledAt) : null
           const startDate = edit?.start_date ? new Date(edit.start_date) : null
+          const deduction =
+            edit?.cancellation_deduction != null
+              ? Number(edit.cancellation_deduction)
+              : cancellationWithinOneYear(startDate, cancelledDate)
+                ? Number(r.valor_comissao ?? 0)
+                : 0
           contracts.push({
             id: processId,
             name: null,
@@ -426,8 +440,8 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             pre_processual_agent_id: null,
             service_type: null,
             case_type: edit?.case_type || r.acao_cli || null,
-            contracted_value: value,
-            commission_base_value: value,
+            contracted_value: edit?.value != null ? Number(edit.value) : null,
+            commission_base_value: edit?.value != null ? Number(edit.value) : null,
             entry_value: null,
             entry_payment_method: null,
             is_entry_paid: null,
@@ -439,7 +453,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             cancellation_date:
               cancelledDate && !Number.isNaN(cancelledDate.getTime()) ? cancelledDate.toISOString() : null,
             cancellation_reason: null,
-            cancellation_deduction: edit?.cancellation_deduction != null ? Number(edit.cancellation_deduction) : null,
+            cancellation_deduction: deduction,
             internal_failure: null,
             manager: null,
             address: null,
@@ -448,7 +462,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             budget_planned: null,
             progress_percentage: null,
             total_area: null,
-            closed_by: edit?.closed_by || r.nome_solicitante || null,
+            closed_by: edit?.closed_by || r.nome_consultora_atendimento || null,
           })
         }
 
