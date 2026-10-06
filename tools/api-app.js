@@ -517,7 +517,7 @@ app.put('/api/consultant-emails', async (req, res) => {
 // is printed by hiding the others. PREMIACAO_RECIPIENTS, if set, get a copy of each.
 // Triggered by Vercel Cron (see vercel.json); the month defaults to the previous one
 // in Brasília time and can be overridden with ?month=&year= for a manual run.
-app.get('/api/cron/premiacao', async (req, res) => {
+async function sendPremiacao(req, res) {
   if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' })
   }
@@ -525,8 +525,9 @@ app.get('/api/cron/premiacao', async (req, res) => {
 
   const brasilia = new Date(Date.now() - 3 * 60 * 60 * 1000)
   const current0 = brasilia.getUTCMonth()
-  const month = Number(req.query.month) || (current0 === 0 ? 12 : current0)
-  const year = Number(req.query.year) || (current0 === 0 ? brasilia.getUTCFullYear() - 1 : brasilia.getUTCFullYear())
+  const params = { ...req.query, ...(req.body || {}) }
+  const month = Number(params.month) || (current0 === 0 ? 12 : current0)
+  const year = Number(params.year) || (current0 === 0 ? brasilia.getUTCFullYear() - 1 : brasilia.getUTCFullYear())
   const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080')
   const label = `${String(month).padStart(2, '0')}-${year}`
 
@@ -600,6 +601,9 @@ app.get('/api/cron/premiacao', async (req, res) => {
     if (browser) try { await browser.close() } catch {}
     if (conn) try { await conn.end() } catch {}
   }
-})
+}
+
+app.get('/api/cron/premiacao', sendPremiacao)
+app.post('/api/premiacao/enviar', express.json(), sendPremiacao)
 
 export default app

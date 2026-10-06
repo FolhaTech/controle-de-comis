@@ -49,6 +49,7 @@ import { ConsultantDeductionsDialog } from './equipe/ConsultantDeductionsDialog'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 import { PremiacaoReport } from './equipe/premiacaoPdf'
+import { PremiacaoEmailDialog } from './equipe/PremiacaoEmailDialog'
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -211,6 +212,7 @@ export default function Equipe() {
             <FileDown className="mr-2 h-4 w-4" />
             {`Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
           </Button>
+          <PremiacaoEmailDialog />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleOpenNew} className="w-full sm:w-auto">
