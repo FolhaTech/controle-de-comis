@@ -172,7 +172,27 @@ app.get('/api/contratos-cancelados', async (req, res) => {
       FROM vw_contratos_cancelados v
       GROUP BY v.processo_id
     `)
-    res.json({ data: rows })
+    const [payments] = await conn.execute(`
+      SELECT cpf_cliente, data_pgto_cliente FROM mod_cad_clientes
+      WHERE data_pgto_cliente IS NOT NULL AND cpf_cliente IS NOT NULL AND cpf_cliente <> ''
+    `)
+    const paymentsByCpf = new Map()
+    for (const p of payments) {
+      const key = String(p.cpf_cliente).replace(/\D/g, '')
+      if (!key) continue
+      if (!paymentsByCpf.has(key)) paymentsByCpf.set(key, [])
+      paymentsByCpf.get(key).push(new Date(p.data_pgto_cliente).getTime())
+    }
+    // Latest payment of the same CPF made on or before the cancellation — the only
+    // one that can place the cancellation inside the 1-year window.
+    const data = rows.map((row) => {
+      const cancelled = row.data_cancelamento ? new Date(row.data_cancelamento).getTime() : null
+      const cpfPayments = paymentsByCpf.get(String(row.cpf_cliente ?? '').replace(/\D/g, '')) ?? []
+      const eligible = cancelled == null ? [] : cpfPayments.filter((t) => t <= cancelled)
+      const latest = eligible.length ? Math.max(...eligible) : null
+      return { ...row, data_pgto_cpf: latest == null ? null : new Date(latest) }
+    })
+    res.json({ data })
   } catch (err) {
     console.error('GET /api/contratos-cancelados error', err)
     res.status(500).json({ error: String(err) })

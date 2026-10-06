@@ -415,7 +415,8 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
         // Cancelled contracts come from vw_contratos_cancelados: the handling
         // consultant is closed_by, and the clawback is valor_comissao, but only
         // when the cancellation falls between the payment date and one year after
-        // it. Without a payment date (or a manual start date) it isn't deducted.
+        // it. The payment date is the process's own, else the latest payment of the
+        // same CPF made before the cancellation. Without one it isn't deducted.
         const cancelledRows = await fetchCancelledRows().catch(() => [] as Record<string, any>[])
         for (const r of cancelledRows) {
           const processId = String(r.processo_id ?? '')
@@ -423,7 +424,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           const edit = editsByProcessId.get(processId)
           const cancelledAt = edit?.cancellation_date ?? r.data_cancelamento ?? null
           const cancelledDate = cancelledAt ? new Date(cancelledAt) : null
-          const startSource = edit?.start_date || r.data_pgto_cliente || null
+          const startSource = edit?.start_date || r.data_pgto_cliente || r.data_pgto_cpf || null
           const startDate = startSource ? new Date(startSource) : null
           const deduction =
             edit?.cancellation_deduction != null
