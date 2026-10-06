@@ -7,9 +7,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+// Names the commission bonus rules look for ('Cartão' and 'À Vista' earn the
+// high-value bonus, see calculateCommissionBreakdown).
+export const PAYMENT_METHODS = ['PIX', 'Cartão', 'Boleto', 'Transferência', 'À Vista'] as const
+
 export interface ContractAdjustmentFormValues {
   client: string
   case_type: string
+  // Empty keeps the payment method coming from the CRM.
+  payment_method: string
   value: number
   start_date: string
   closed_by: string
@@ -66,6 +72,7 @@ export function ContractAdjustmentForm({
 }: ContractAdjustmentFormProps) {
   const [client, setClient] = useState(initialValues?.client ?? '')
   const [caseType, setCaseType] = useState(initialValues?.case_type ?? '')
+  const [paymentMethod, setPaymentMethod] = useState(initialValues?.payment_method ?? '')
   const [value, setValue] = useState(initialValues?.value != null ? String(initialValues.value) : '')
   const [startDate, setStartDate] = useState(initialValues?.start_date ?? '')
   const [closedBy, setClosedBy] = useState(initialValues?.closed_by ?? '')
@@ -100,6 +107,7 @@ export function ContractAdjustmentForm({
       await onSubmit({
         client: client.trim(),
         case_type: caseType.trim(),
+        payment_method: paymentMethod,
         value: numericValue,
         start_date: startDate,
         closed_by: closedBy,
@@ -145,6 +153,22 @@ export function ContractAdjustmentForm({
       <div className="space-y-1">
         <Label htmlFor="adj-case-type">Tipo de Ação</Label>
         <Input id="adj-case-type" value={caseType} onChange={(e) => setCaseType(e.target.value)} placeholder="Ex: Saúde - Reparadora" />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="adj-payment-method">Forma de pagamento</Label>
+        <Select value={paymentMethod || 'crm'} onValueChange={(v) => setPaymentMethod(v === 'crm' ? '' : v)}>
+          <SelectTrigger id="adj-payment-method">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="crm">Manter do CRM</SelectItem>
+            {PAYMENT_METHODS.map((m) => (
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="adj-value">Valor</Label>

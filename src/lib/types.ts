@@ -106,6 +106,8 @@ export interface ContractAdjustment {
   // Required when adding a new contract through the form (see
   // ContractAdjustmentForm) — optional when editing one already on file.
   notes: string | null
+  // Overrides the CRM payment method when set (see PAYMENT_METHODS in ContractAdjustmentForm).
+  payment_method: string | null
   created_at: string | null
   updated_at: string | null
 }

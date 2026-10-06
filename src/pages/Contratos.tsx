@@ -321,6 +321,7 @@ export default function Contratos() {
                     ? {
                         client: editingContract.client || editingContract.name || '',
                         case_type: editingContract.case_type || '',
+                        payment_method: editingContract.payment_method || '',
                         value: valueOf(editingContract),
                         start_date: editingContract.start_date ? editingContract.start_date.slice(0, 10) : '',
                         closed_by: editingContract.closed_by || '',
