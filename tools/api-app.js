@@ -162,6 +162,9 @@ app.get('/api/contratos-cancelados', async (req, res) => {
              MAX(v.data_cancelamento) AS data_cancelamento,
              MAX(v.nome_consultora_atendimento) AS nome_consultora_atendimento,
              MAX(v.valor_comissao) AS valor_comissao,
+             (SELECT MAX(T3.data_pgto_cliente) FROM gdp_processo_tarefa T2
+                JOIN mod_cad_clientes T3 ON T3.processo_tarefa_id = T2.id
+               WHERE T2.processo_id = v.processo_id) AS data_pgto_cliente,
              (SELECT T3.acao_cli FROM gdp_processo_tarefa T2
                 JOIN mod_cad_clientes T3 ON T3.processo_tarefa_id = T2.id
                WHERE T2.processo_id = v.processo_id AND T3.acao_cli IS NOT NULL AND T3.acao_cli <> ''

@@ -158,11 +158,13 @@ function apiBases(): string[] {
   return bases
 }
 
-function cancellationWithinOneYear(start: Date | null, cancelled: Date | null): boolean {
+// Deducts only when the cancellation falls from the payment date (start) up to
+// one year after it.
+function cancellationInDeductionWindow(start: Date | null, cancelled: Date | null): boolean {
   if (!start || !cancelled || Number.isNaN(start.getTime()) || Number.isNaN(cancelled.getTime())) return false
   const oneYearLater = new Date(start)
   oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
-  return cancelled < oneYearLater
+  return cancelled >= start && cancelled < oneYearLater
 }
 
 async function fetchCancelledRows(): Promise<Record<string, any>[]> {
@@ -411,10 +413,9 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
         }
 
         // Cancelled contracts come from vw_contratos_cancelados: the handling
-        // consultant is closed_by, and the clawback is valor_comissao — but only
-        // when the cancellation falls within 1 year of the contract's start date,
-        // which the view doesn't carry, so it comes from a manual edit. Without a
-        // start date the contract isn't deducted.
+        // consultant is closed_by, and the clawback is valor_comissao, but only
+        // when the cancellation falls between the payment date and one year after
+        // it. Without a payment date (or a manual start date) it isn't deducted.
         const cancelledRows = await fetchCancelledRows().catch(() => [] as Record<string, any>[])
         for (const r of cancelledRows) {
           const processId = String(r.processo_id ?? '')
@@ -422,11 +423,12 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
           const edit = editsByProcessId.get(processId)
           const cancelledAt = edit?.cancellation_date ?? r.data_cancelamento ?? null
           const cancelledDate = cancelledAt ? new Date(cancelledAt) : null
-          const startDate = edit?.start_date ? new Date(edit.start_date) : null
+          const startSource = edit?.start_date || r.data_pgto_cliente || null
+          const startDate = startSource ? new Date(startSource) : null
           const deduction =
             edit?.cancellation_deduction != null
               ? Number(edit.cancellation_deduction)
-              : cancellationWithinOneYear(startDate, cancelledDate)
+              : cancellationInDeductionWindow(startDate, cancelledDate)
                 ? Number(r.valor_comissao ?? 0)
                 : 0
           contracts.push({
