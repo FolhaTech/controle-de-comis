@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
+import nodemailer from 'nodemailer'
 
 dotenv.config()
 
@@ -452,6 +453,77 @@ app.get('/api/processos/quarter', async (req, res) => {
     res.status(500).json({ error: String(err) })
   } finally {
     if (conn) try { await conn.end() } catch {}
+  }
+})
+
+// Monthly Premiação PDF for every consultant with contracts in the closed month,
+// rendered as one document in headless Chromium (the app's /premiacao-print page)
+// and emailed as the only attachment. Triggered by Vercel Cron (see vercel.json);
+// the month defaults to the previous one in Brasília time and can be overridden
+// with ?month=&year= for a manual run.
+app.get('/api/cron/premiacao', async (req, res) => {
+  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'unauthorized' })
+  }
+  const recipients = (process.env.PREMIACAO_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (!recipients.length) {
+    return res.status(500).json({ error: 'PREMIACAO_RECIPIENTS is not set' })
+  }
+
+  const brasilia = new Date(Date.now() - 3 * 60 * 60 * 1000)
+  const current0 = brasilia.getUTCMonth()
+  const month = Number(req.query.month) || (current0 === 0 ? 12 : current0)
+  const year = Number(req.query.year) || (current0 === 0 ? brasilia.getUTCFullYear() - 1 : brasilia.getUTCFullYear())
+  const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080')
+
+  let browser
+  try {
+    const { default: chromium } = await import('@sparticuz/chromium')
+    const { default: puppeteer } = await import('puppeteer-core')
+    browser = await puppeteer.launch({
+      executablePath: process.env.CHROME_PATH || (await chromium.executablePath()),
+      args: chromium.args,
+      headless: true,
+    })
+
+    const page = await browser.newPage()
+    await page.goto(`${appUrl}/premiacao-print?month=${month}&year=${year}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 120000,
+    })
+    await page.waitForSelector('#premiacao-print-root[data-ready="true"]', { timeout: 240000 })
+    const count = Number(await page.$eval('#premiacao-print-root', (el) => el.dataset.contractCount))
+    if (!count) {
+      return res.json({ sent: 0, month, year })
+    }
+    const pdf = Buffer.from(
+      await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '16px', right: '16px', bottom: '16px', left: '16px' },
+      }),
+    )
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.office365.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+    })
+    const label = `${String(month).padStart(2, '0')}-${year}`
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: recipients,
+      subject: `Premiação ${String(month).padStart(2, '0')}/${year}`,
+      attachments: [{ filename: `Premiacao ${label}.pdf`, content: pdf, contentType: 'application/pdf' }],
+    })
+    res.json({ sent: count, month, year })
+  } catch (err) {
+    console.error('GET /api/cron/premiacao error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (browser) try { await browser.close() } catch {}
   }
 })
 

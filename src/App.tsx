@@ -12,6 +12,7 @@ import Quarter from './pages/Quarter'
 import Configuracoes from './pages/Configuracoes'
 import Parametros from './pages/Parametros'
 import Processos from './pages/Processos'
+import PremiacaoPrintPage from './pages/PremiacaoPrintPage'
 import NotFound from './pages/NotFound'
 
 const App = () => (
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/parametros" element={<Parametros />} />
               <Route path="/processos" element={<Processos />} />
             </Route>
+            <Route path="/premiacao-print" element={<PremiacaoPrintPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>
