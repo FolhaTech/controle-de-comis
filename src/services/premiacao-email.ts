@@ -11,6 +11,7 @@ export async function sendPremiacaoEmails(
   secret: string,
   month: number,
   year: number,
+  names?: string[],
 ): Promise<{ data: PremiacaoEmailResult | null; error: string | null }> {
   let lastError = 'API indisponível'
   for (const base of apiBases()) {
@@ -18,7 +19,7 @@ export async function sendPremiacaoEmails(
       const res = await fetch(`${base}/api/premiacao/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ month, year }),
+        body: JSON.stringify({ month, year, names }),
       })
       const body = await res.json().catch(() => ({}))
       if (res.status === 401) return { data: null, error: 'Senha de envio incorreta.' }

@@ -568,7 +568,11 @@ async function sendPremiacao(req, res) {
 
     const sent = []
     const skippedWithoutEmail = []
+    const onlyNames = Array.isArray(params.names)
+      ? new Set(params.names.map((n) => String(n).trim().toLowerCase()))
+      : null
     for (const name of names) {
+      if (onlyNames && !onlyNames.has(name.trim().toLowerCase())) continue
       const to = emailByName.get(name.trim().toLowerCase())
       if (!to) {
         skippedWithoutEmail.push(name)
