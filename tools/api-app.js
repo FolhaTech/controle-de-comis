@@ -456,28 +456,88 @@ app.get('/api/processos/quarter', async (req, res) => {
   }
 })
 
-// Monthly Premiação PDF for every consultant with contracts in the closed month,
-// rendered as one document in headless Chromium (the app's /premiacao-print page)
-// and emailed as the only attachment. Triggered by Vercel Cron (see vercel.json);
-// the month defaults to the previous one in Brasília time and can be overridden
-// with ?month=&year= for a manual run.
+// Email per team member, used by the monthly Premiação send. Keyed by the
+// normalized consultant name (trimmed, lowercase), the same key the cron matches on.
+async function ensureConsultantEmailsTable(conn) {
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS consultant_emails (
+      name VARCHAR(255) PRIMARY KEY,
+      email VARCHAR(255) NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `)
+}
+
+app.get('/api/consultant-emails', async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    await ensureConsultantEmailsTable(conn)
+    const [rows] = await conn.execute(`SELECT name, email FROM consultant_emails`)
+    res.json({ data: rows })
+  } catch (err) {
+    console.error('GET /api/consultant-emails error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.put('/api/consultant-emails', async (req, res) => {
+  let conn
+  try {
+    const name = String(req.body?.name ?? '').trim().toLowerCase()
+    const email = String(req.body?.email ?? '').trim()
+    if (!name) return res.status(400).json({ error: 'name is required' })
+    conn = await getConnection()
+    await ensureConsultantEmailsTable(conn)
+    if (!email) {
+      await conn.execute(`DELETE FROM consultant_emails WHERE name = ?`, [name])
+    } else {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'invalid email' })
+      }
+      await conn.execute(
+        `INSERT INTO consultant_emails (name, email) VALUES (?, ?) ON DUPLICATE KEY UPDATE email = VALUES(email)`,
+        [name, email],
+      )
+    }
+    res.json({ error: null })
+  } catch (err) {
+    console.error('PUT /api/consultant-emails error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+// Monthly Premiação PDFs: one per consultant with contracts in the closed month,
+// each emailed to that consultant's address (see consultant_emails). All reports are
+// rendered once on the app's /premiacao-print page, then each consultant's report
+// is printed by hiding the others. PREMIACAO_RECIPIENTS, if set, get a copy of each.
+// Triggered by Vercel Cron (see vercel.json); the month defaults to the previous one
+// in Brasília time and can be overridden with ?month=&year= for a manual run.
 app.get('/api/cron/premiacao', async (req, res) => {
   if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' })
   }
-  const recipients = (process.env.PREMIACAO_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
-  if (!recipients.length) {
-    return res.status(500).json({ error: 'PREMIACAO_RECIPIENTS is not set' })
-  }
+  const copyTo = (process.env.PREMIACAO_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
 
   const brasilia = new Date(Date.now() - 3 * 60 * 60 * 1000)
   const current0 = brasilia.getUTCMonth()
   const month = Number(req.query.month) || (current0 === 0 ? 12 : current0)
   const year = Number(req.query.year) || (current0 === 0 ? brasilia.getUTCFullYear() - 1 : brasilia.getUTCFullYear())
   const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080')
+  const label = `${String(month).padStart(2, '0')}-${year}`
 
+  let conn
   let browser
   try {
+    conn = await getConnection()
+    await ensureConsultantEmailsTable(conn)
+    const [emailRows] = await conn.execute(`SELECT name, email FROM consultant_emails`)
+    const emailByName = new Map(emailRows.map((r) => [r.name, r.email]))
+
     const { default: chromium } = await import('@sparticuz/chromium')
     const { default: puppeteer } = await import('puppeteer-core')
     browser = await puppeteer.launch({
@@ -492,17 +552,7 @@ app.get('/api/cron/premiacao', async (req, res) => {
       timeout: 120000,
     })
     await page.waitForSelector('#premiacao-print-root[data-ready="true"]', { timeout: 240000 })
-    const count = Number(await page.$eval('#premiacao-print-root', (el) => el.dataset.contractCount))
-    if (!count) {
-      return res.json({ sent: 0, month, year })
-    }
-    const pdf = Buffer.from(
-      await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '16px', right: '16px', bottom: '16px', left: '16px' },
-      }),
-    )
+    const names = await page.$$eval('[data-consultant]', (els) => els.map((el) => el.dataset.consultant))
 
     const transporter = nodemailer.createTransport({
       host: 'smtp.office365.com',
@@ -511,19 +561,44 @@ app.get('/api/cron/premiacao', async (req, res) => {
       requireTLS: true,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
     })
-    const label = `${String(month).padStart(2, '0')}-${year}`
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: recipients,
-      subject: `Premiação ${String(month).padStart(2, '0')}/${year}`,
-      attachments: [{ filename: `Premiacao ${label}.pdf`, content: pdf, contentType: 'application/pdf' }],
-    })
-    res.json({ sent: count, month, year })
+
+    const sent = []
+    const skippedWithoutEmail = []
+    for (const name of names) {
+      const to = emailByName.get(name.trim().toLowerCase())
+      if (!to) {
+        skippedWithoutEmail.push(name)
+        continue
+      }
+      await page.evaluate((target) => {
+        document.querySelectorAll('[data-consultant]').forEach((el) => {
+          el.style.display = el.dataset.consultant === target ? '' : 'none'
+        })
+      }, name)
+      const pdf = Buffer.from(
+        await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '16px', right: '16px', bottom: '16px', left: '16px' },
+        }),
+      )
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        cc: copyTo.length ? copyTo : undefined,
+        subject: `Premiação ${String(month).padStart(2, '0')}/${year} - ${name}`,
+        attachments: [{ filename: `Premiacao ${name} ${label}.pdf`, content: pdf, contentType: 'application/pdf' }],
+      })
+      sent.push(name)
+    }
+
+    res.json({ sent, skipped_without_email: skippedWithoutEmail, month, year })
   } catch (err) {
     console.error('GET /api/cron/premiacao error', err)
     res.status(500).json({ error: String(err) })
   } finally {
     if (browser) try { await browser.close() } catch {}
+    if (conn) try { await conn.end() } catch {}
   }
 })
 

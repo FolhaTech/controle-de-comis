@@ -37,16 +37,17 @@ export default function PremiacaoPrintPage() {
     <div id="premiacao-print-root" data-ready={loaded ? 'true' : 'false'} data-contract-count={loaded ? withActivity.length : 0}>
       {loaded &&
         withActivity.map((consultant, index) => (
-          <PremiacaoReport
-            key={consultant.id}
-            consultant={consultant}
-            contracts={contracts}
-            consultantDeductions={consultantDeductions}
-            settings={settings}
-            month={month}
-            year={year}
-            pageBreakAfter={index < withActivity.length - 1}
-          />
+          <div key={consultant.id} data-consultant={consultant.name}>
+            <PremiacaoReport
+              consultant={consultant}
+              contracts={contracts}
+              consultantDeductions={consultantDeductions}
+              settings={settings}
+              month={month}
+              year={year}
+              pageBreakAfter={index < withActivity.length - 1}
+            />
+          </div>
         ))}
     </div>
   )

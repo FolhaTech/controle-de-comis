@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -23,11 +23,17 @@ import {
 import useAppStore from '@/stores/useAppStore'
 import { Consultant } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
+import {
+  fetchConsultantEmails,
+  normalizeConsultantName,
+  saveConsultantEmail,
+} from '@/services/consultant-emails'
 
 const formSchema = z
   .object({
     name: z.string().min(2, 'Nome muito curto'),
     role: z.string().min(1, 'Cargo obrigatório'),
+    email: z.string().refine((v) => v === '' || z.string().email().safeParse(v).success, 'Email inválido'),
     phone: z.string().optional(),
     pix_key: z.string().optional(),
     cnpj: z.string().optional(),
@@ -59,6 +65,7 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
       ? {
           name: consultant.name,
           role: consultant.role || '',
+          email: '',
           phone: consultant.phone || '',
           pix_key: consultant.pix_key || '',
           cnpj: consultant.cnpj || '',
@@ -72,6 +79,7 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
       : {
           name: '',
           role: '',
+          email: '',
           phone: '',
           pix_key: '',
           cnpj: '',
@@ -85,31 +93,46 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
 
   const participates = form.watch('participates_in_averages')
 
+  useEffect(() => {
+    if (!consultant) return
+    fetchConsultantEmails()
+      .then((emails) => {
+        const saved = emails[normalizeConsultantName(consultant.name)]
+        if (saved) form.setValue('email', saved)
+      })
+      .catch(() => {})
+  }, [consultant, form])
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)
-    const { is_attendant, is_active, ...rest } = values
+    const { is_attendant, is_active, email, ...rest } = values
     const memberData = {
       ...rest,
       type: is_attendant ? 'atendente' : 'consultor',
       status: is_active ? 'active' : 'inactive',
     }
 
-    if (consultant) {
-      const { error } = await updateConsultant(consultant.id, memberData)
-      if (error) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar.' })
-      } else {
-        toast({ title: 'Membro atualizado' })
-        onSuccess()
-      }
+    const { error } = consultant
+      ? await updateConsultant(consultant.id, memberData)
+      : await addConsultant(memberData)
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: consultant ? 'Não foi possível salvar.' : 'Não foi possível criar.',
+      })
     } else {
-      const { error } = await addConsultant(memberData)
-      if (error) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível criar.' })
+      const emailResult = await saveConsultantEmail(values.name, email)
+      if (emailResult.error) {
+        toast({
+          variant: 'destructive',
+          title: 'Email não salvo',
+          description: 'Os dados do membro foram salvos, mas o email não.',
+        })
       } else {
-        toast({ title: 'Membro criado' })
-        onSuccess()
+        toast({ title: consultant ? 'Membro atualizado' : 'Membro criado' })
       }
+      onSuccess()
     }
     setIsSubmitting(false)
   }
@@ -139,6 +162,20 @@ export function ConsultantForm({ consultant, onSuccess }: ConsultantFormProps) {
               <FormLabel>Cargo</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: Consultor Senior, Atendente Pré-processual" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email (recebe o PDF da premiação)</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="consultor@empresa.com.br" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

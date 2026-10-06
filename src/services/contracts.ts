@@ -1,3 +1,4 @@
+import { apiBases } from './api-base'
 import { Contract, ContractAdjustment } from '@/lib/types'
 import { fetchContractAdjustments } from './contract-adjustments'
 
@@ -145,17 +146,6 @@ function resolveCompetenciaDate(paymentDateStr: string, signatureDateStr: unknow
   // Signature isn't in the payment's month nor the immediate next one —
   // likely a data anomaly, not a genuine trailing signature. Keep payment's month.
   return paymentDate
-}
-
-function apiBases(): string[] {
-  const bases = [
-    (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
-    'http://localhost:4000',
-    'http://localhost:4001',
-    'http://localhost:4002',
-  ].filter(Boolean) as string[]
-  bases.push('') // same-origin fallback, e.g. Vercel's /api/*
-  return bases
 }
 
 // Deducts only when the cancellation falls from the payment date (start) up to
