@@ -160,6 +160,23 @@ function apiBases(): string[] {
 
 // Deducts only when the cancellation falls from the payment date (start) up to
 // one year after it.
+// Names the CRM uses for a team member that differ from the roster name.
+const CONSULTORA_ALIASES: Record<string, string> = {
+  amanda: 'Amanda Iagarashi',
+  'amanda pires iagarashi': 'Amanda Iagarashi',
+  ivani: 'Ivani Silva',
+  'ivani maria': 'Ivani Silva',
+  denise: 'Denise Germano',
+  'camila rodrigues salles': 'Camila Salles',
+  kamila: 'Kamila Marson',
+  'kamila marson naresse': 'Kamila Marson',
+}
+
+function consultoraName(raw: string): string {
+  const trimmed = raw.trim()
+  return CONSULTORA_ALIASES[trimmed.toLowerCase()] ?? trimmed
+}
+
 function cancellationInDeductionWindow(start: Date | null, cancelled: Date | null): boolean {
   if (!start || !cancelled || Number.isNaN(start.getTime()) || Number.isNaN(cancelled.getTime())) return false
   const oneYearLater = new Date(start)
@@ -465,7 +482,9 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
             budget_planned: null,
             progress_percentage: null,
             total_area: null,
-            closed_by: edit?.closed_by || r.nome_consultora_atendimento || null,
+            closed_by:
+              edit?.closed_by ||
+              (r.nome_consultora_atendimento ? consultoraName(r.nome_consultora_atendimento) : null),
           })
         }
 
