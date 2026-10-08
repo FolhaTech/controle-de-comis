@@ -174,9 +174,16 @@ app.put('/api/users/:id', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const id = Number(req.params.id)
-    const role = req.body?.role === 'admin' || req.body?.role === 'comum' ? req.body.role : undefined
+    // An admin editing their own account can only change their password — not
+    // their own role or consultant_name, so a misclick in the admin UI can't
+    // demote or re-scope the account doing the editing (the same reasoning as
+    // blocking self-delete below).
+    const editingSelf = id === req.user.id
+    const role = !editingSelf && (req.body?.role === 'admin' || req.body?.role === 'comum') ? req.body.role : undefined
     const consultant_name =
-      req.body?.consultant_name !== undefined ? String(req.body.consultant_name || '').trim() || null : undefined
+      !editingSelf && req.body?.consultant_name !== undefined
+        ? String(req.body.consultant_name || '').trim() || null
+        : undefined
     const password = typeof req.body?.password === 'string' && req.body.password ? req.body.password : undefined
     if (role === 'comum' && consultant_name === null) {
       return res.status(400).json({ error: 'consultant_name é obrigatório para o papel comum' })

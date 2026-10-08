@@ -86,8 +86,11 @@ export function UserManagement() {
     setIsDialogOpen(true)
   }
 
-  const isValid =
-    form.role === 'admin'
+  const editingSelf = editingUser?.id === currentUser?.id
+
+  const isValid = editingSelf
+    ? true
+    : form.role === 'admin'
       ? editingUser || (form.email && form.password)
       : form.consultant_name.trim().length > 0 && (editingUser || (form.email && form.password))
 
@@ -96,8 +99,7 @@ export function UserManagement() {
     const consultant_name = form.role === 'comum' ? form.consultant_name.trim() : null
     const { error } = editingUser
       ? await updateUser(editingUser.id, {
-          role: form.role,
-          consultant_name,
+          ...(editingSelf ? {} : { role: form.role, consultant_name }),
           ...(form.password ? { password: form.password } : {}),
         })
       : await createUser({ email: form.email.trim().toLowerCase(), password: form.password, role: form.role, consultant_name })
@@ -172,6 +174,7 @@ export function UserManagement() {
                 <Label>Papel</Label>
                 <Select
                   value={form.role}
+                  disabled={editingSelf}
                   onValueChange={(v) => setForm((f) => ({ ...f, role: v as 'admin' | 'comum' }))}
                 >
                   <SelectTrigger>
@@ -182,8 +185,13 @@ export function UserManagement() {
                     <SelectItem value="admin">Admin (vê e edita tudo)</SelectItem>
                   </SelectContent>
                 </Select>
+                {editingSelf && (
+                  <p className="text-xs text-muted-foreground">
+                    Você não pode trocar o próprio papel. Peça a outro admin.
+                  </p>
+                )}
               </div>
-              {form.role === 'comum' && (
+              {form.role === 'comum' && !editingSelf && (
                 <div className="space-y-1">
                   <Label>De quem são os dados</Label>
                   <Select
