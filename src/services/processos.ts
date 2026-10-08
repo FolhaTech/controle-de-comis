@@ -1,4 +1,5 @@
 import type { Process, ProcessStats, PaginatedProcesses, QuarterData } from '@/lib/processos'
+import { apiBases, authFetch } from './api-base'
 
 const sampleProcesses: Process[] = [
   {
@@ -139,14 +140,6 @@ function getQuarterDateRange(year: number, quarter: number) {
   return { startDate, nextStartDate }
 }
 
-const API_BASES = [
-  (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
-  'http://localhost:4000',
-  'http://localhost:4001',
-  'http://localhost:4002',
-].filter(Boolean) as string[]
-API_BASES.push('') // same-origin fallback, e.g. Vercel's /api/*
-
 function mapRowToProcess(row: Record<string, any>): Process {
   return {
     processo_id: String(row.processo_id ?? ''),
@@ -176,12 +169,12 @@ export async function fetchQuarterData(year: number, quarter: number): Promise<Q
   const { startDate, nextStartDate } = getQuarterDateRange(year, quarter)
   try {
     let lastError: unknown
-    for (const API_BASE of API_BASES) {
+    for (const API_BASE of apiBases()) {
       try {
         const url = `${API_BASE}/api/processos/quarter?start_date=${encodeURIComponent(
           startDate,
         )}&next_start_date=${encodeURIComponent(nextStartDate)}`
-        const res = await fetch(url)
+        const res = await authFetch(url)
         if (!res.ok) throw new Error(`API error ${res.status}`)
         const body = await res.json()
         const rows: Record<string, any>[] = body?.processes ?? []

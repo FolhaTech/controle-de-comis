@@ -1,4 +1,4 @@
-import { apiBases } from './api-base'
+import { apiBases, authFetch } from './api-base'
 import { Contract, ContractAdjustment } from '@/lib/types'
 import { fetchContractAdjustments } from './contract-adjustments'
 
@@ -178,7 +178,7 @@ async function fetchCancelledRows(): Promise<Record<string, any>[]> {
   let lastError: unknown
   for (const API_BASE of apiBases()) {
     try {
-      const res = await fetch(`${API_BASE}/api/contratos-cancelados`)
+      const res = await authFetch(`${API_BASE}/api/contratos-cancelados`)
       if (!res.ok) throw new Error(`API error ${res.status}`)
       const body = await res.json()
       return body?.data ?? []
@@ -206,7 +206,7 @@ export async function fetchContracts(): Promise<{ data: Contract[] | null; error
     for (const API_BASE of apiBases()) {
       try {
         const url = `${API_BASE}/api/vw_formas_pagamentos`
-        const res = await fetch(url)
+        const res = await authFetch(url)
         if (!res.ok) throw new Error(`API error ${res.status}`)
         const body = await res.json()
         const rows: Record<string, any>[] = body?.data ?? []

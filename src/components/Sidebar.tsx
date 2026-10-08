@@ -1,5 +1,4 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import {
   LayoutDashboard,
@@ -16,33 +15,28 @@ import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 
+// Processos, Parâmetros and Configurações carry admin-only actions (editing
+// goals, tiers, action types and user roles) — hidden entirely for 'comum'
+// users, who only get the read-only, scoped-to-themselves pages.
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: FileText, label: 'Contratos', path: '/contratos' },
-  { icon: Users, label: 'Equipe', path: '/equipe' },
-  { icon: Target, label: 'Quarter', path: '/quarter' },
-  { icon: Scale, label: 'Processos', path: '/processos' },
-  { icon: SlidersHorizontal, label: 'Parâmetros', path: '/parametros' },
-  { icon: Settings, label: 'Configurações', path: '/configuracoes' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/', adminOnly: false },
+  { icon: FileText, label: 'Contratos', path: '/contratos', adminOnly: false },
+  { icon: Users, label: 'Equipe', path: '/equipe', adminOnly: false },
+  { icon: Target, label: 'Quarter', path: '/quarter', adminOnly: false },
+  { icon: Scale, label: 'Processos', path: '/processos', adminOnly: true },
+  { icon: SlidersHorizontal, label: 'Parâmetros', path: '/parametros', adminOnly: true },
+  { icon: Settings, label: 'Configurações', path: '/configuracoes', adminOnly: true },
 ]
 
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut, user } = useAuth()
-  const [profileName, setProfileName] = useState('Usuário')
-  const [profileRole, setProfileRole] = useState('')
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user?.role === 'admin')
 
-  useEffect(() => {
-    if (user) {
-      setProfileName(user.full_name || 'Usuário')
-      setProfileRole(user.role || '')
-    }
-  }, [user])
-
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+  const handleSignOut = () => {
+    signOut()
+    navigate('/login')
   }
 
   const NavContent = () => (
@@ -55,7 +49,7 @@ export function Sidebar({ className }: { className?: string }) {
         </h2>
       </div>
       <nav className="flex-1 space-y-1 p-4">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
@@ -72,8 +66,10 @@ export function Sidebar({ className }: { className?: string }) {
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center justify-between px-4 py-3 bg-white/5 rounded-lg">
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-white">{profileName}</span>
-            <span className="text-xs text-white/60 capitalize">{profileRole}</span>
+            <span className="text-sm font-semibold text-white truncate max-w-[140px]">
+              {user?.consultant_name || user?.email || 'Usuário'}
+            </span>
+            <span className="text-xs text-white/60">{user?.role === 'admin' ? 'Administrador' : 'Comum'}</span>
           </div>
           <button
             onClick={handleSignOut}

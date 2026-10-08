@@ -7,14 +7,14 @@ import { Label } from '@/components/ui/label'
 import { Scale } from 'lucide-react'
 
 export default function Login() {
-  const { signIn, session, loading: authLoading } = useAuth()
+  const { signIn, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  if (!authLoading && session) {
+  if (!authLoading && user) {
     return <Navigate to="/" replace />
   }
 
@@ -24,7 +24,7 @@ export default function Login() {
     setError('')
     const { error } = await signIn(email, password)
     if (error) {
-      setError('Credenciais inválidas. Verifique e tente novamente.')
+      setError(error)
       setLoading(false)
     } else {
       navigate('/')

@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import useAppStore from '@/stores/useAppStore'
 import { useToast } from '@/hooks/use-toast'
+import { UserManagement } from './configuracoes/UserManagement'
 
 export default function Configuracoes() {
   const { settings, updateSettings } = useAppStore()
@@ -43,9 +44,10 @@ export default function Configuracoes() {
       <h2 className="text-2xl font-serif font-bold">Configurações do Sistema</h2>
 
       <Tabs defaultValue="metas" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="metas">Metas e Gatilhos</TabsTrigger>
           <TabsTrigger value="ajuda">Ajuda de Custo (IPCA)</TabsTrigger>
+          <TabsTrigger value="usuarios">Usuários</TabsTrigger>
         </TabsList>
 
         <TabsContent value="metas" className="mt-6 space-y-6">
@@ -287,6 +289,10 @@ export default function Configuracoes() {
               </form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="usuarios" className="mt-6">
+          <UserManagement />
         </TabsContent>
       </Tabs>
     </div>

@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
+import { useAuth } from '@/hooks/use-auth'
 import {
   calculatePersonMonthlyCommission,
   calculateMonthlyDeduction,
@@ -118,6 +119,8 @@ export default function Equipe() {
     settings,
     filter,
   } = useAppStore()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConsultant, setEditingConsultant] = useState<Consultant | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<Consultant | null>(null)
@@ -212,25 +215,29 @@ export default function Equipe() {
             <FileDown className="mr-2 h-4 w-4" />
             {`Extrair PDFs (${MONTHS[filter.month - 1]}/${filter.year})`}
           </Button>
-          <PremiacaoEmailDialog />
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenNew} className="w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" /> Novo Membro
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
-                </DialogTitle>
-              </DialogHeader>
-              <ConsultantForm
-                consultant={editingConsultant}
-                onSuccess={() => setIsDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          {isAdmin && (
+            <>
+              <PremiacaoEmailDialog />
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={handleOpenNew} className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" /> Novo Membro
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingConsultant ? 'Editar Membro' : 'Registrar Novo Membro'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <ConsultantForm
+                    consultant={editingConsultant}
+                    onSuccess={() => setIsDialogOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
       </div>
 
@@ -444,31 +451,35 @@ export default function Equipe() {
                         >
                           <FileDown className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          title="Descontos"
-                          onClick={() => setViewingDeductionsFor(consultant)}
-                        >
-                          <Wallet className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleEdit(consultant)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteTarget(consultant)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title="Descontos"
+                              onClick={() => setViewingDeductionsFor(consultant)}
+                            >
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleEdit(consultant)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteTarget(consultant)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

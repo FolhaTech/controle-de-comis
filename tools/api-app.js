@@ -4,6 +4,8 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
 import nodemailer from 'nodemailer'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
 
 dotenv.config()
 
@@ -29,7 +31,195 @@ async function getConnection() {
   })
 }
 
-app.get('/api/clients', async (req, res) => {
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET is not configured')
+  return secret
+}
+
+// Every data route requires a valid session: comum (role) users are consultants
+// who only see their own data (enforced client-side, by consultant_name — see
+// useAppStore), admins see and manage everything. Writes additionally require
+// requireAdmin, since comum is read-only.
+function authenticate(req, res, next) {
+  const header = req.headers.authorization || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return res.status(401).json({ error: 'not authenticated' })
+  try {
+    req.user = jwt.verify(token, getJwtSecret())
+    next()
+  } catch {
+    return res.status(401).json({ error: 'invalid or expired session' })
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'admin only' })
+  next()
+}
+
+async function ensureAppUsersTable(conn) {
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS app_users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role ENUM('admin','comum') NOT NULL DEFAULT 'comum',
+      consultant_name VARCHAR(255) NULL,
+      created_at TIMESTAMP NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `)
+}
+
+function toPublicUser(row) {
+  return { id: row.id, email: row.email, role: row.role, consultant_name: row.consultant_name }
+}
+
+app.post('/api/auth/login', async (req, res) => {
+  let conn
+  try {
+    const email = String(req.body?.email ?? '').trim().toLowerCase()
+    const password = String(req.body?.password ?? '')
+    if (!email || !password) return res.status(400).json({ error: 'email e senha são obrigatórios' })
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    const [rows] = await conn.execute('SELECT * FROM app_users WHERE email = ?', [email])
+    const row = rows[0]
+    if (!row || !(await bcrypt.compare(password, row.password_hash))) {
+      return res.status(401).json({ error: 'email ou senha inválidos' })
+    }
+    const user = toPublicUser(row)
+    const token = jwt.sign(user, getJwtSecret(), { expiresIn: '30d' })
+    res.json({ token, user })
+  } catch (err) {
+    console.error('POST /api/auth/login error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+// Re-reads the DB row (rather than trusting the token's own claims) so a role or
+// consultant_name change the admin makes takes effect the next time the app
+// loads, without waiting for the 30-day token to expire.
+app.get('/api/auth/me', authenticate, async (req, res) => {
+  // The internal service token minted for the headless Premiação print page
+  // (see sendPremiacao) has no row in app_users — trust its own claims.
+  if (req.user.id === 0) return res.json({ user: req.user })
+  let conn
+  try {
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    const [rows] = await conn.execute('SELECT * FROM app_users WHERE id = ?', [req.user.id])
+    if (!rows[0]) return res.status(401).json({ error: 'user not found' })
+    res.json({ user: toPublicUser(rows[0]) })
+  } catch (err) {
+    console.error('GET /api/auth/me error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    const [rows] = await conn.execute('SELECT id, email, role, consultant_name, created_at FROM app_users ORDER BY email')
+    res.json({ data: rows })
+  } catch (err) {
+    console.error('GET /api/users error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.post('/api/users', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    const email = String(req.body?.email ?? '').trim().toLowerCase()
+    const password = String(req.body?.password ?? '')
+    const role = req.body?.role === 'admin' ? 'admin' : 'comum'
+    const consultant_name = req.body?.consultant_name ? String(req.body.consultant_name).trim() : null
+    if (!email || !password) return res.status(400).json({ error: 'email e senha são obrigatórios' })
+    if (role === 'comum' && !consultant_name) {
+      return res.status(400).json({ error: 'consultant_name é obrigatório para o papel comum' })
+    }
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    const hash = await bcrypt.hash(password, 10)
+    try {
+      await conn.execute(
+        'INSERT INTO app_users (email, password_hash, role, consultant_name, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [email, hash, role, consultant_name],
+      )
+    } catch (err) {
+      if (err?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'email já cadastrado' })
+      throw err
+    }
+    const [rows] = await conn.execute('SELECT id, email, role, consultant_name, created_at FROM app_users WHERE email = ?', [email])
+    res.status(201).json({ data: rows[0] })
+  } catch (err) {
+    console.error('POST /api/users error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.put('/api/users/:id', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    const id = Number(req.params.id)
+    const role = req.body?.role === 'admin' || req.body?.role === 'comum' ? req.body.role : undefined
+    const consultant_name =
+      req.body?.consultant_name !== undefined ? String(req.body.consultant_name || '').trim() || null : undefined
+    const password = typeof req.body?.password === 'string' && req.body.password ? req.body.password : undefined
+    if (role === 'comum' && consultant_name === null) {
+      return res.status(400).json({ error: 'consultant_name é obrigatório para o papel comum' })
+    }
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    if (role !== undefined) await conn.execute('UPDATE app_users SET role = ? WHERE id = ?', [role, id])
+    if (consultant_name !== undefined) {
+      await conn.execute('UPDATE app_users SET consultant_name = ? WHERE id = ?', [consultant_name, id])
+    }
+    if (password) {
+      const hash = await bcrypt.hash(password, 10)
+      await conn.execute('UPDATE app_users SET password_hash = ? WHERE id = ?', [hash, id])
+    }
+    const [rows] = await conn.execute('SELECT id, email, role, consultant_name, created_at FROM app_users WHERE id = ?', [id])
+    if (!rows[0]) return res.status(404).json({ error: 'not found' })
+    res.json({ data: rows[0] })
+  } catch (err) {
+    console.error('PUT /api/users/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.delete('/api/users/:id', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    const id = Number(req.params.id)
+    if (id === req.user.id) return res.status(400).json({ error: 'você não pode excluir sua própria conta' })
+    conn = await getConnection()
+    await ensureAppUsersTable(conn)
+    await conn.execute('DELETE FROM app_users WHERE id = ?', [id])
+    res.json({ error: null })
+  } catch (err) {
+    console.error('DELETE /api/users/:id error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.get('/api/clients', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -44,7 +234,7 @@ app.get('/api/clients', async (req, res) => {
   }
 })
 
-app.get('/api/inserrido-pgto', async (req, res) => {
+app.get('/api/inserrido-pgto', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -117,7 +307,7 @@ const FORMAS_PAGAMENTOS_QUERY = `
      OR T2.nom_tarefa = '15 - Cancelamento contrato'
 `
 
-app.get('/api/vw_formas_pagamentos', async (req, res) => {
+app.get('/api/vw_formas_pagamentos', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -152,7 +342,7 @@ app.get('/api/vw_formas_pagamentos', async (req, res) => {
 // consultant who handled it (nome_consultora_atendimento) and the commission to
 // claw back (valor_comissao). case_type comes from the base tables, since the view
 // doesn't carry it.
-app.get('/api/contratos-cancelados', async (req, res) => {
+app.get('/api/contratos-cancelados', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -207,7 +397,7 @@ app.get('/api/contratos-cancelados', async (req, res) => {
 // exclude one entirely) — kept in our own table since we don't write back
 // into the CRM's tables. Applied on top of FORMAS_PAGAMENTOS_QUERY's output
 // by fetchContracts() in src/services/contracts.ts.
-app.get('/api/contract-adjustments', async (req, res) => {
+app.get('/api/contract-adjustments', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -221,7 +411,7 @@ app.get('/api/contract-adjustments', async (req, res) => {
   }
 })
 
-app.post('/api/contract-adjustments', async (req, res) => {
+app.post('/api/contract-adjustments', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { action, target_processo_id, closed_by, client, case_type, value, start_date, status, cancellation_date, cancellation_deduction, notes, payment_method } = req.body || {}
@@ -258,7 +448,7 @@ app.post('/api/contract-adjustments', async (req, res) => {
   }
 })
 
-app.put('/api/contract-adjustments/:id', async (req, res) => {
+app.put('/api/contract-adjustments/:id', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { id } = req.params
@@ -289,7 +479,7 @@ app.put('/api/contract-adjustments/:id', async (req, res) => {
   }
 })
 
-app.delete('/api/contract-adjustments/:id', async (req, res) => {
+app.delete('/api/contract-adjustments/:id', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { id } = req.params
@@ -309,7 +499,7 @@ app.delete('/api/contract-adjustments/:id', async (req, res) => {
 // kept in our own table since consultants themselves aren't server-persisted
 // (they're seeded per-browser from nome_solicitante, see /api/inserrido-pgto).
 // Keyed by consultant_name rather than any consultant id for that reason.
-app.get('/api/consultant-deductions', async (req, res) => {
+app.get('/api/consultant-deductions', authenticate, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -323,7 +513,7 @@ app.get('/api/consultant-deductions', async (req, res) => {
   }
 })
 
-app.post('/api/consultant-deductions', async (req, res) => {
+app.post('/api/consultant-deductions', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { consultant_name, description, total_value, installments, start_month, start_year } = req.body || {}
@@ -351,7 +541,7 @@ app.post('/api/consultant-deductions', async (req, res) => {
   }
 })
 
-app.put('/api/consultant-deductions/:id', async (req, res) => {
+app.put('/api/consultant-deductions/:id', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { id } = req.params
@@ -372,7 +562,7 @@ app.put('/api/consultant-deductions/:id', async (req, res) => {
   }
 })
 
-app.delete('/api/consultant-deductions/:id', async (req, res) => {
+app.delete('/api/consultant-deductions/:id', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const { id } = req.params
@@ -407,7 +597,7 @@ function isDocFilled(value) {
   return value !== null && value !== undefined && value !== '' && value !== '0'
 }
 
-app.get('/api/processos/quarter', async (req, res) => {
+app.get('/api/processos/quarter', authenticate, async (req, res) => {
   let conn
   try {
     const startDate = req.query.start_date
@@ -468,7 +658,7 @@ async function ensureConsultantEmailsTable(conn) {
   `)
 }
 
-app.get('/api/consultant-emails', async (req, res) => {
+app.get('/api/consultant-emails', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     conn = await getConnection()
@@ -483,7 +673,7 @@ app.get('/api/consultant-emails', async (req, res) => {
   }
 })
 
-app.put('/api/consultant-emails', async (req, res) => {
+app.put('/api/consultant-emails', authenticate, requireAdmin, async (req, res) => {
   let conn
   try {
     const name = String(req.body?.name ?? '').trim().toLowerCase()
@@ -551,6 +741,18 @@ async function sendPremiacao(req, res) {
     })
 
     const page = await browser.newPage()
+    // The print page is a normal authenticated route (every data endpoint now
+    // requires a session) — mint a short-lived internal admin token and seed it
+    // into localStorage before any app script runs, so the headless page logs
+    // itself in instead of hitting the login screen.
+    const serviceToken = jwt.sign(
+      { id: 0, email: 'premiacao@sistema.interno', role: 'admin', consultant_name: null },
+      getJwtSecret(),
+      { expiresIn: '10m' },
+    )
+    await page.evaluateOnNewDocument((token) => {
+      localStorage.setItem('controle-de-comis-token', token)
+    }, serviceToken)
     await page.goto(`${appUrl}/premiacao-print?month=${month}&year=${year}`, {
       waitUntil: 'domcontentloaded',
       timeout: 120000,

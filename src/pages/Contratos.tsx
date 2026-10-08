@@ -44,6 +44,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import useAppStore from '@/stores/useAppStore'
+import { useAuth } from '@/hooks/use-auth'
 import { ContractAdjustmentForm, toEditableStatus, type ContractAdjustmentFormValues } from './equipe/ContractAdjustmentForm'
 import { useContractRowActions } from '@/hooks/use-contract-row-actions'
 import { Contract } from '@/lib/types'
@@ -70,6 +71,8 @@ const formatDate = (dateStr: string | null | undefined) => {
 
 export default function Contratos() {
   const { contracts, contractsLoading, contractsError, filter, consultants, fetchContracts } = useAppStore()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const { saveAdd, saveEdit, removeContract } = useContractRowActions()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
@@ -302,12 +305,14 @@ export default function Contratos() {
           >
             <Download className="mr-2 h-4 w-4" /> Exportar
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenNew} className="w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" /> Novo Contrato
-              </Button>
-            </DialogTrigger>
+          <Dialog open={isAdmin && isDialogOpen} onOpenChange={setIsDialogOpen}>
+            {isAdmin && (
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenNew} className="w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" /> Novo Contrato
+                </Button>
+              </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[420px]">
               <DialogHeader>
                 <DialogTitle>
@@ -530,45 +535,47 @@ export default function Contratos() {
                     {formatDate(contract.start_date)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(contract)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir o contrato de{' '}
-                              <strong>{contract.client}</strong>? Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(contract)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    {isAdmin && (
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(contract)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir Contrato</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir o contrato de{' '}
+                                <strong>{contract.client}</strong>? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(contract)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

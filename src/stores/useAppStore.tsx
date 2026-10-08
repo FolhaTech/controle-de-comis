@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { normalizeConsultantName } from '@/services/consultant-emails'
 import {
   Contract,
   Consultant,
@@ -119,17 +121,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     year: new Date().getFullYear(),
   })
 
+  // A comum user is a consultant who only sees their own data — scoping every
+  // list here, once, means every page that reads from this store (Dashboard,
+  // Equipe, Contratos, Quarter) is automatically restricted without each one
+  // having to know about roles. Admins get everything, unfiltered.
+  const { user } = useAuth()
+  const isScoped = user?.role === 'comum'
+  const scopeName = isScoped ? normalizeConsultantName(user?.consultant_name || '') : null
+
   const fetchConsultants = useCallback(async () => {
     setConsultantsLoading(true)
     const [{ data, error }, { data: deductions }] = await Promise.all([
       fetchTeamMembers(),
       fetchConsultantDeductions(),
     ])
-    if (!error && data) setConsultants(data)
-    if (deductions) setConsultantDeductions(deductions)
+    if (!error && data) {
+      setConsultants(isScoped ? data.filter((c) => normalizeConsultantName(c.name) === scopeName) : data)
+    }
+    if (deductions) {
+      setConsultantDeductions(
+        isScoped ? deductions.filter((d) => normalizeConsultantName(d.consultant_name) === scopeName) : deductions,
+      )
+    }
     setConsultantsLoading(false)
     return { error }
-  }, [])
+  }, [isScoped, scopeName])
 
   const fetchContractsAction = useCallback(async () => {
     setContractsLoading(true)
@@ -141,10 +157,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) {
       setContractsError('Não foi possível carregar os contratos. Verifique sua conexão.')
     }
-    if (!error && data) setContracts(data)
+    if (!error && data) {
+      setContracts(
+        isScoped ? data.filter((c) => normalizeConsultantName(c.closed_by || '') === scopeName) : data,
+      )
+    }
     if (adjustments) setContractAdjustments(adjustments)
     setContractsLoading(false)
-  }, [])
+  }, [isScoped, scopeName])
 
   const fetchActionTypesAction = useCallback(async () => {
     setActionTypesLoading(true)

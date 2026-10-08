@@ -1,18 +1,18 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
+import { apiBases, authFetch, getAuthToken, setAuthToken, AUTH_EXPIRED_EVENT } from '@/services/api-base'
 
-interface AuthUser {
-  id: string
+export interface AuthUser {
+  id: number
   email: string
-  full_name: string
-  role: string
+  role: 'admin' | 'comum'
+  consultant_name: string | null
 }
 
 interface AuthContextType {
   user: AuthUser | null
-  session: Record<string, string> | null
-  signIn: (email: string, password: string) => Promise<{ error: unknown }>
-  signOut: () => Promise<{ error: unknown }>
   loading: boolean
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signOut: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,26 +24,70 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user] = useState<AuthUser>({
-    id: 'local-user',
-    email: 'usuario@local.com',
-    full_name: 'Usuário Local',
-    role: 'Administrador',
-  })
-  const [session] = useState<Record<string, string>>({ token: 'local-session' })
-  const [loading] = useState(false)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const signIn = async () => {
-    return { error: null }
-  }
+  const signOut = useCallback(() => {
+    setAuthToken(null)
+    setUser(null)
+  }, [])
 
-  const signOut = async () => {
-    return { error: null }
-  }
+  useEffect(() => {
+    const token = getAuthToken()
+    if (!token) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      for (const base of apiBases()) {
+        try {
+          const res = await authFetch(`${base}/api/auth/me`)
+          if (!res.ok) throw new Error(`status ${res.status}`)
+          const body = await res.json()
+          if (!cancelled) setUser(body.user)
+          break
+        } catch {
+          // try next base
+        }
+      }
+      if (!cancelled) setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleExpired = () => signOut()
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpired)
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpired)
+  }, [signOut])
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    let lastError = 'Não foi possível conectar ao servidor.'
+    for (const base of apiBases()) {
+      try {
+        const res = await fetch(`${base}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          return { error: body?.error ?? 'Email ou senha inválidos.' }
+        }
+        setAuthToken(body.token)
+        setUser(body.user)
+        return { error: null }
+      } catch (err) {
+        lastError = String(err)
+      }
+    }
+    return { error: lastError }
+  }, [])
 
   return (
-    <AuthContext.Provider value={{ user, session, signIn, signOut, loading }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>{children}</AuthContext.Provider>
   )
 }

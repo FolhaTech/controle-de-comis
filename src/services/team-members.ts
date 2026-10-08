@@ -1,4 +1,5 @@
 import { Consultant } from '@/lib/types'
+import { apiBases, authFetch } from './api-base'
 
 const TEAM_MEMBERS_STORAGE_KEY = 'controle-de-comis-team-members'
 
@@ -48,17 +49,9 @@ function makeConsultant(name: string): Consultant {
 }
 
 async function fetchInserridoPgtoNames(): Promise<string[]> {
-  const API_BASES = [
-    (import.meta.env.VITE_API_URL as string | undefined)?.trim(),
-    'http://localhost:4000',
-    'http://localhost:4001',
-    'http://localhost:4002',
-  ].filter(Boolean) as string[]
-  API_BASES.push('') // same-origin fallback, e.g. Vercel's /api/*
-
-  for (const API_BASE of API_BASES) {
+  for (const API_BASE of apiBases()) {
     try {
-      const res = await fetch(`${API_BASE}/api/inserrido-pgto`)
+      const res = await authFetch(`${API_BASE}/api/inserrido-pgto`)
       if (!res.ok) continue
       const body = await res.json()
       const names: string[] = body?.names ?? []
