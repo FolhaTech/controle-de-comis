@@ -6,6 +6,8 @@ import mysql from 'mysql2/promise'
 import nodemailer from 'nodemailer'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import multer from 'multer'
+import * as XLSX from 'xlsx'
 
 dotenv.config()
 
@@ -821,5 +823,398 @@ async function sendPremiacao(req, res) {
 
 app.get('/api/cron/premiacao', sendPremiacao)
 app.post('/api/premiacao/enviar', express.json(), sendPremiacao)
+
+// ---------------------------------------------------------------------------
+// Comissão Pré: premiação coletiva/individual das atendentes do pré-processual,
+// alimentada por upload manual da planilha exportada do Legal One ("Folha 1").
+// Período de fechamento: dia 20 de um mês até dia 19 do mês seguinte, rotulado
+// pelo mês de fechamento (ex.: liberação em 25/01 ou 05/02 caem no período
+// "2026-02"). Regras de valor vêm do combinado com a diretoria (ver anexos):
+//   - Individual: 40 liberações no período = R$ 50. 3º mês consecutivo batendo
+//     a meta = R$ 150 no lugar de R$ 50; o ciclo reinicia depois disso.
+//   - Coletivo (atendentes): maior gatilho de total de pastas da equipe no
+//     período — 120/150/175/200 pastas = R$ 50/150/200/300 para cada atendente.
+//   - Coletivo (gestão direta): mesmos gatilhos, 120/150/175/200 pastas =
+//     R$ 100/200/300/400 para a gestora direta.
+const GESTORA_DIRETA_NOME = 'Nathalia Lima'
+const INDIVIDUAL_GOAL = 40
+const INDIVIDUAL_VALOR = 50
+const INDIVIDUAL_STREAK3_VALOR = 150
+const COLLECTIVE_TIERS_ATENDENTE = [
+  { min: 200, valor: 300 },
+  { min: 175, valor: 200 },
+  { min: 150, valor: 150 },
+  { min: 120, valor: 50 },
+]
+const COLLECTIVE_TIERS_GESTAO = [
+  { min: 200, valor: 400 },
+  { min: 175, valor: 300 },
+  { min: 150, valor: 200 },
+  { min: 120, valor: 100 },
+]
+
+function collectiveTierValue(total, tiers) {
+  for (const t of tiers) if (total >= t.min) return t.valor
+  return 0
+}
+
+// Dado o rótulo de um período ("YYYY-MM", mês de fechamento), devolve o
+// intervalo [início, fim) real: início = dia 20 do mês anterior, fim = dia 20
+// do próprio mês (exclusivo, ou seja, cobre até dia 19 23:59:59).
+function comissaoPreriodBounds(label) {
+  const [y, m] = label.split('-').map(Number)
+  const start = new Date(y, m - 2, 20, 0, 0, 0, 0)
+  const end = new Date(y, m - 1, 20, 0, 0, 0, 0)
+  return { start, end }
+}
+
+// Rótulo do período anterior ao informado, para buscar o streak de meses
+// consecutivos de cada atendente.
+function comissaoPreriodPrevLabel(label) {
+  const [y, m] = label.split('-').map(Number)
+  const prev = new Date(y, m - 2, 1)
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Rótulo do período (mês de fechamento) a que uma data de liberação pertence.
+function comissaoPreriodLabelFor(date) {
+  const d = new Date(date)
+  const closing = new Date(d.getFullYear(), d.getMonth() + (d.getDate() >= 20 ? 1 : 0), 1)
+  return `${closing.getFullYear()}-${String(closing.getMonth() + 1).padStart(2, '0')}`
+}
+
+// streak_individual guardado é sempre 0, 1, 2 ou 3 — o valor alcançado NESTE
+// período. Um streak de 3 (que já pagou o bônus) reinicia o ciclo: o próximo
+// mês que bater a meta volta a contar como 1º mês, não como 4º.
+function comissaoPreIndividualResult(count, prevStreakStored) {
+  if (count < INDIVIDUAL_GOAL) return { bateu: false, streak: 0, valor: 0 }
+  const effectivePrev = prevStreakStored === 3 ? 0 : prevStreakStored || 0
+  const streak = effectivePrev + 1
+  const valor = streak >= 3 ? INDIVIDUAL_STREAK3_VALOR : INDIVIDUAL_VALOR
+  return { bateu: true, streak: Math.min(streak, 3), valor }
+}
+
+async function ensurePreProcessualTables(conn) {
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS pre_processual_liberacoes (
+      pasta VARCHAR(50) PRIMARY KEY,
+      acao VARCHAR(255) NULL,
+      cliente VARCHAR(255) NULL,
+      responsavel VARCHAR(255) NULL,
+      data_cadastro DATETIME NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `)
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS pre_processual_premiacoes (
+      periodo VARCHAR(7) NOT NULL,
+      responsavel VARCHAR(255) NOT NULL,
+      liberacoes INT NOT NULL,
+      bateu_individual TINYINT(1) NOT NULL,
+      streak_individual INT NOT NULL,
+      valor_individual DECIMAL(9,2) NOT NULL,
+      valor_coletivo DECIMAL(9,2) NOT NULL,
+      valor_total DECIMAL(9,2) NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (periodo, responsavel)
+    )
+  `)
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS pre_processual_gestao (
+      periodo VARCHAR(7) PRIMARY KEY,
+      total_pastas INT NOT NULL,
+      valor_gestao DECIMAL(9,2) NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `)
+}
+
+// Calcula a premiação de um período a partir das liberações importadas — não
+// grava nada, serve para prévia a qualquer momento (GET /periodo/:label) e
+// como base para a consolidação oficial (POST /consolidar).
+async function computeComissaoPre(conn, label) {
+  const { start, end } = comissaoPreriodBounds(label)
+  const [rows] = await conn.execute(
+    `SELECT responsavel, COUNT(*) AS liberacoes FROM pre_processual_liberacoes
+     WHERE data_cadastro >= ? AND data_cadastro < ? AND responsavel IS NOT NULL AND responsavel <> ''
+     GROUP BY responsavel`,
+    [start, end],
+  )
+  const totalPastas = rows.reduce((sum, r) => sum + Number(r.liberacoes), 0)
+  const valorColetivoAtendente = collectiveTierValue(totalPastas, COLLECTIVE_TIERS_ATENDENTE)
+  const valorGestao = collectiveTierValue(totalPastas, COLLECTIVE_TIERS_GESTAO)
+
+  const prevLabel = comissaoPreriodPrevLabel(label)
+  const [prevRows] = await conn.execute(
+    `SELECT responsavel, streak_individual FROM pre_processual_premiacoes WHERE periodo = ?`,
+    [prevLabel],
+  )
+  const prevStreakByName = new Map(prevRows.map((r) => [r.responsavel, r.streak_individual]))
+
+  const atendentes = rows
+    .map((r) => {
+      const count = Number(r.liberacoes)
+      const prevStreak = prevStreakByName.get(r.responsavel) ?? 0
+      const ind = comissaoPreIndividualResult(count, prevStreak)
+      return {
+        responsavel: r.responsavel,
+        liberacoes: count,
+        bateu_individual: ind.bateu,
+        streak_individual: ind.streak,
+        valor_individual: ind.valor,
+        valor_coletivo: valorColetivoAtendente,
+        valor_total: ind.valor + valorColetivoAtendente,
+      }
+    })
+    .sort((a, b) => b.liberacoes - a.liberacoes)
+
+  return {
+    periodo: label,
+    inicio: start.toISOString(),
+    fim: end.toISOString(),
+    total_pastas: totalPastas,
+    valor_gestao: valorGestao,
+    gestora_direta: GESTORA_DIRETA_NOME,
+    atendentes,
+  }
+}
+
+// Grava o resultado oficial do período — chamado só pela consolidação (manual
+// ou pelo cron), nunca pela prévia, porque isso é o que vira o histórico e a
+// base de streak dos próximos períodos.
+async function persistComissaoPre(conn, computed) {
+  for (const a of computed.atendentes) {
+    await conn.execute(
+      `INSERT INTO pre_processual_premiacoes
+         (periodo, responsavel, liberacoes, bateu_individual, streak_individual, valor_individual, valor_coletivo, valor_total)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         liberacoes = VALUES(liberacoes), bateu_individual = VALUES(bateu_individual),
+         streak_individual = VALUES(streak_individual), valor_individual = VALUES(valor_individual),
+         valor_coletivo = VALUES(valor_coletivo), valor_total = VALUES(valor_total)`,
+      [
+        computed.periodo,
+        a.responsavel,
+        a.liberacoes,
+        a.bateu_individual ? 1 : 0,
+        a.streak_individual,
+        a.valor_individual,
+        a.valor_coletivo,
+        a.valor_total,
+      ],
+    )
+  }
+  await conn.execute(
+    `INSERT INTO pre_processual_gestao (periodo, total_pastas, valor_gestao) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE total_pastas = VALUES(total_pastas), valor_gestao = VALUES(valor_gestao)`,
+    [computed.periodo, computed.total_pastas, computed.valor_gestao],
+  )
+}
+
+const preProcessualUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } })
+
+// Importa a planilha "Folha 1" do Legal One. Upsert por Pasta (chave real do
+// processo), então re-subir a mesma planilha atualizada não duplica nada.
+app.post(
+  '/api/pre-processual/upload',
+  authenticate,
+  requireAdmin,
+  preProcessualUpload.single('file'),
+  async (req, res) => {
+    let conn
+    try {
+      if (!req.file) return res.status(400).json({ error: 'arquivo é obrigatório' })
+      const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true })
+      const headerIdx = rows.findIndex((r) => Array.isArray(r) && r.includes('Pasta'))
+      if (headerIdx === -1) {
+        return res.status(400).json({ error: 'cabeçalho "Pasta" não encontrado na planilha' })
+      }
+      const header = rows[headerIdx]
+      const col = (name) => header.indexOf(name)
+      const idxPasta = col('Pasta')
+      const idxAcao = col('Ação')
+      const idxCliente = col('Cliente')
+      const idxResponsavel = col('Responsável Pré Processual')
+      const idxData = col('Data do cadastro')
+      if ([idxPasta, idxResponsavel, idxData].some((i) => i === -1)) {
+        return res.status(400).json({
+          error: 'colunas obrigatórias não encontradas (Pasta, Responsável Pré Processual, Data do cadastro)',
+        })
+      }
+
+      const records = []
+      for (let i = headerIdx + 1; i < rows.length; i++) {
+        const r = rows[i]
+        if (!r || !r[idxPasta]) continue
+        const dataCadastro = r[idxData]
+        records.push({
+          pasta: String(r[idxPasta]).trim(),
+          acao: idxAcao >= 0 && r[idxAcao] != null ? String(r[idxAcao]) : null,
+          cliente: idxCliente >= 0 && r[idxCliente] != null ? String(r[idxCliente]) : null,
+          responsavel: r[idxResponsavel] ? String(r[idxResponsavel]).trim() : null,
+          data_cadastro: dataCadastro instanceof Date ? dataCadastro : null,
+        })
+      }
+      if (!records.length) return res.status(400).json({ error: 'nenhuma linha válida encontrada' })
+
+      conn = await getConnection()
+      await ensurePreProcessualTables(conn)
+      for (const rec of records) {
+        await conn.execute(
+          `INSERT INTO pre_processual_liberacoes (pasta, acao, cliente, responsavel, data_cadastro)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE acao = VALUES(acao), cliente = VALUES(cliente),
+             responsavel = VALUES(responsavel), data_cadastro = VALUES(data_cadastro)`,
+          [rec.pasta, rec.acao, rec.cliente, rec.responsavel, rec.data_cadastro],
+        )
+      }
+      const periodos = new Set(records.filter((r) => r.data_cadastro).map((r) => comissaoPreriodLabelFor(r.data_cadastro)))
+      res.json({ imported: records.length, periodos: [...periodos].sort() })
+    } catch (err) {
+      console.error('POST /api/pre-processual/upload error', err)
+      res.status(500).json({ error: String(err) })
+    } finally {
+      if (conn) try { await conn.end() } catch {}
+    }
+  },
+)
+
+app.get('/api/pre-processual/periodo/:label', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    await ensurePreProcessualTables(conn)
+    res.json(await computeComissaoPre(conn, req.params.label))
+  } catch (err) {
+    console.error('GET /api/pre-processual/periodo error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+app.get('/api/pre-processual/historico', authenticate, requireAdmin, async (req, res) => {
+  let conn
+  try {
+    conn = await getConnection()
+    await ensurePreProcessualTables(conn)
+    const [premiacoes] = await conn.execute(`SELECT * FROM pre_processual_premiacoes ORDER BY periodo DESC, valor_total DESC`)
+    const [gestao] = await conn.execute(`SELECT * FROM pre_processual_gestao ORDER BY periodo DESC`)
+    res.json({ premiacoes, gestao })
+  } catch (err) {
+    console.error('GET /api/pre-processual/historico error', err)
+    res.status(500).json({ error: String(err) })
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+})
+
+async function renderComissaoPrePdf(appUrl, label) {
+  const { default: chromium } = await import('@sparticuz/chromium')
+  const { default: puppeteer } = await import('puppeteer-core')
+  const browser = await puppeteer.launch({
+    executablePath: process.env.CHROME_PATH || (await chromium.executablePath()),
+    args: chromium.args,
+    headless: true,
+  })
+  try {
+    const page = await browser.newPage()
+    const serviceToken = jwt.sign(
+      { id: 0, email: 'comissao-pre@sistema.interno', role: 'admin', consultant_name: null },
+      getJwtSecret(),
+      { expiresIn: '10m' },
+    )
+    await page.evaluateOnNewDocument((token) => {
+      localStorage.setItem('controle-de-comis-token', token)
+    }, serviceToken)
+    await page.goto(`${appUrl}/comissao-pre-print?periodo=${label}`, { waitUntil: 'domcontentloaded', timeout: 120000 })
+    await page.waitForSelector('#comissao-pre-print-root[data-ready="true"]', { timeout: 120000 })
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '16px', right: '16px', bottom: '16px', left: '16px' },
+    })
+    return Buffer.from(pdf)
+  } finally {
+    await browser.close()
+  }
+}
+
+// Consolida um período (calcula, grava oficialmente, gera o PDF e manda o
+// e-mail de aprovação). Usado tanto pelo botão manual (admin logado, sem
+// precisar da senha de cron) quanto pelo cron do dia 19 (CRON_SECRET).
+async function consolidarComissaoPre(label, { recipients, appUrl }) {
+  let conn
+  try {
+    conn = await getConnection()
+    await ensurePreProcessualTables(conn)
+    const computed = await computeComissaoPre(conn, label)
+    await persistComissaoPre(conn, computed)
+
+    let pdf = null
+    try {
+      pdf = await renderComissaoPrePdf(appUrl, label)
+    } catch (err) {
+      console.error('renderComissaoPrePdf error', err)
+    }
+
+    if (pdf && recipients.length) {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.office365.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+      })
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: recipients,
+        subject: `Comissão Pré ${label} — aprovação de pagamento`,
+        text: 'Segue em anexo o relatório da Comissão Pré do período para aprovação do pagamento.',
+        attachments: [{ filename: `Comissao-Pre-${label}.pdf`, content: pdf, contentType: 'application/pdf' }],
+      })
+    }
+    return { ...computed, email_sent: !!(pdf && recipients.length) }
+  } finally {
+    if (conn) try { await conn.end() } catch {}
+  }
+}
+
+app.post('/api/pre-processual/consolidar', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const label = String(req.body?.periodo || '')
+    if (!/^\d{4}-\d{2}$/.test(label)) return res.status(400).json({ error: 'periodo inválido (use YYYY-MM)' })
+    const recipients = (process.env.COMISSAO_PRE_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    const appUrl =
+      process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080')
+    const result = await consolidarComissaoPre(label, { recipients, appUrl })
+    res.json(result)
+  } catch (err) {
+    console.error('POST /api/pre-processual/consolidar error', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
+// Agendado para o dia 19 (fim do período) — ver vercel.json. Consolida
+// automaticamente o período que acabou de fechar.
+app.get('/api/cron/comissao-pre', async (req, res) => {
+  try {
+    if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'unauthorized' })
+    }
+    const brasilia = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    const label = req.query.periodo ? String(req.query.periodo) : comissaoPreriodLabelFor(brasilia)
+    const recipients = (process.env.COMISSAO_PRE_RECIPIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    const appUrl =
+      process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080')
+    const result = await consolidarComissaoPre(label, { recipients, appUrl })
+    res.json(result)
+  } catch (err) {
+    console.error('GET /api/cron/comissao-pre error', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
 
 export default app

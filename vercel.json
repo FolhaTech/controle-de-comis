@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/premiacao",
       "schedule": "0 17 6 * *"
+    },
+    {
+      "path": "/api/cron/comissao-pre",
+      "schedule": "0 12 19 * *"
     }
   ],
   "rewrites": [

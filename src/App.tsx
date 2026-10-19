@@ -14,7 +14,9 @@ import Quarter from './pages/Quarter'
 import Configuracoes from './pages/Configuracoes'
 import Parametros from './pages/Parametros'
 import Processos from './pages/Processos'
+import ComissaoPre from './pages/ComissaoPre'
 import PremiacaoPrintPage from './pages/PremiacaoPrintPage'
+import ComissaoPrePrintPage from './pages/ComissaoPrePrintPage'
 import NotFound from './pages/NotFound'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -77,12 +79,28 @@ const App = () => (
                   </RequireAdmin>
                 }
               />
+              <Route
+                path="/comissao-pre"
+                element={
+                  <RequireAdmin>
+                    <ComissaoPre />
+                  </RequireAdmin>
+                }
+              />
             </Route>
             <Route
               path="/premiacao-print"
               element={
                 <RequireAuth>
                   <PremiacaoPrintPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/comissao-pre-print"
+              element={
+                <RequireAuth>
+                  <ComissaoPrePrintPage />
                 </RequireAuth>
               }
             />

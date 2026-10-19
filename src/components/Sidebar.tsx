@@ -10,6 +10,7 @@ import {
   Menu,
   SlidersHorizontal,
   Scale,
+  Receipt,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -24,6 +25,7 @@ const navItems = [
   { icon: Users, label: 'Equipe', path: '/equipe', adminOnly: false },
   { icon: Target, label: 'Quarter', path: '/quarter', adminOnly: false },
   { icon: Scale, label: 'Processos', path: '/processos', adminOnly: true },
+  { icon: Receipt, label: 'Comissão Pré', path: '/comissao-pre', adminOnly: true },
   { icon: SlidersHorizontal, label: 'Parâmetros', path: '/parametros', adminOnly: true },
   { icon: Settings, label: 'Configurações', path: '/configuracoes', adminOnly: true },
 ]
