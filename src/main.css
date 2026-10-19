@@ -104,7 +104,9 @@
     visibility: hidden;
   }
   #premiacao-print-root,
-  #premiacao-print-root * {
+  #premiacao-print-root *,
+  #comissao-pre-print-root,
+  #comissao-pre-print-root * {
     visibility: visible;
     /* Chrome drops background colors on print unless the user manually
        checks "Background graphics" in the print dialog. These force it,
@@ -113,7 +115,8 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  #premiacao-print-root {
+  #premiacao-print-root,
+  #comissao-pre-print-root {
     position: absolute;
     left: 0;
     top: 0;
