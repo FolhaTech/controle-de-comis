@@ -29,16 +29,19 @@ export interface CreateUserInput {
 
 export async function createUser(input: CreateUserInput): Promise<{ data: AppUser | null; error: unknown }> {
   try {
-    const data = await tryEachBase<AppUser | { error: string }>(
+    const data = await tryEachBase<AppUser>(
       '/api/users',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) },
       async (res) => {
         const body = await res.json()
+        if (res.status === 401) throw new Error('Sua sessão expirou. Entre novamente.')
+        if (res.status === 403) throw new Error('Apenas administradores podem criar usuários.')
         if (!res.ok) throw new Error(body?.error ?? `Erro ${res.status}`)
         return body?.data ?? null
       },
+      true,
     )
-    return { data: data as AppUser, error: null }
+    return { data, error: null }
   } catch (error) {
     return { data: null, error }
   }
