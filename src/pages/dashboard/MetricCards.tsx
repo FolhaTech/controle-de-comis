@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FileCheck, DollarSign, Users, Wallet } from 'lucide-react'
+import { FileCheck, DollarSign, Banknote, Wallet } from 'lucide-react'
 
 interface MetricCardsProps {
   activeContracts: number
   totalContractedValue: number
-  teamSize: number
+  totalEntryValue: number
   remuneracaoTotal: number
   loading?: boolean
 }
@@ -13,7 +13,7 @@ interface MetricCardsProps {
 export function MetricCards({
   activeContracts,
   totalContractedValue,
-  teamSize,
+  totalEntryValue,
   remuneracaoTotal,
   loading = false,
 }: MetricCardsProps) {
@@ -63,12 +63,12 @@ export function MetricCards({
       </Card>
       <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Equipe Ativa</CardTitle>
-          <Users className="h-4 w-4 text-blue-500" />
+          <CardTitle className="text-sm font-medium">Valor Total de Entrada</CardTitle>
+          <Banknote className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{teamSize}</div>
-          <p className="text-xs text-muted-foreground mt-1">Membros ativos</p>
+          <div className="text-2xl font-bold">{formatCurrency(totalEntryValue)}</div>
+          <p className="text-xs text-muted-foreground mt-1">No mês selecionado</p>
         </CardContent>
       </Card>
       <Card className="hover:shadow-md transition-shadow bg-primary/5 border-primary/20">

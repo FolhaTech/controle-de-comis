@@ -66,6 +66,7 @@ export default function Index() {
 
   const activeContracts = metrics.validContractsCount
   const totalContractedValue = metrics.grossRevenue
+  const totalEntryValue = filteredContracts.reduce((sum, contract) => sum + (contract.entry_value ?? 0), 0)
   const scopedConsultants =
     teamFilter === 'all' ? consultants : consultants.filter((c) => c.name === teamFilter)
   const teamSize = scopedConsultants.filter((c) => c.status === 'active').length
@@ -123,7 +124,7 @@ export default function Index() {
       <MetricCards
         activeContracts={activeContracts}
         totalContractedValue={totalContractedValue}
-        teamSize={teamSize}
+        totalEntryValue={totalEntryValue}
         remuneracaoTotal={remuneracaoTotal}
         loading={loading}
       />
